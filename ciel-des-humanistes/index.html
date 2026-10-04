@@ -321,6 +321,8 @@ function migrateSave(o) {
 }
 function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } }
 function B(o) { return (o && (o[S.bg] ?? o.def)) ?? ''; }   // texte selon le background
+// Code de bêta-testeur donné en classe par l'enseignant
+function betaCode(v) { try { return btoa(String(v || '').trim().toUpperCase()) === 'WUFOT1U='; } catch (e) { return false; } }
 function addDoc(id) { if (!S.docs.includes(id)) { S.docs.push(id); toast('Document ajouté au carnet'); save(); } }
 
 let toastT = 0;
@@ -644,11 +646,19 @@ async function drawCertificate() {
   g.fillText('Chapitre 1 : Le renouvellement de la vision de l\'homme', 150, 1040);
   g.textAlign = 'center'; g.strokeStyle = '#2a1d13'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(Wc - 520, 985); g.lineTo(Wc - 170, 985); g.stroke();
   g.fillStyle = '#2a1d13'; g.font = `24px ${AL}`; g.fillText('M. Ménard, enseignant', Wc - 345, 1018);
-  // sceau de cire
-  const cx = Wc / 2 + 10, cy = 985;
-  g.fillStyle = '#8e2a1c'; g.beginPath(); for (let a = 0; a < 24; a++) { const r = a % 2 ? 50 : 56, an = a * Math.PI / 12; g.lineTo(cx + Math.cos(an) * r, cy + Math.sin(an) * r); } g.closePath(); g.fill();
-  g.fillStyle = '#b4412b'; g.beginPath(); g.arc(cx, cy, 40, 0, 7); g.fill(); g.strokeStyle = '#6d1f14'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, 33, 0, 7); g.stroke();
-  g.fillStyle = '#f4d98f'; g.fillRect(cx - 3, cy - 21, 6, 42); g.fillRect(cx - 21, cy - 3, 42, 6); g.fillRect(cx - 8, cy - 8, 16, 16); g.fillStyle = '#b4412b'; g.fillRect(cx - 3, cy - 3, 6, 6);
+  // ruban de bêta-testeur
+  if (S.beta) {
+    g.save(); g.translate(Wc - 230, 190); g.rotate(Math.PI / 4);
+    g.fillStyle = '#1f2b63'; g.fillRect(-260, -30, 520, 60); g.fillStyle = '#e2ae48'; g.fillRect(-260, -30, 520, 5); g.fillRect(-260, 25, 520, 5);
+    g.fillStyle = '#f4d98f'; g.textAlign = 'center'; g.font = `700 26px ${PIX}`; g.fillText('BÊTA-TESTEUR · 2026', 0, 9);
+    g.restore();
+    g.textAlign = 'center'; g.fillStyle = '#1f2b63'; g.font = `italic 22px ${FELL}`; g.fillText('Bêta-testeur officiel : parmi les premiers élèves à avoir exploré ce jeu, à l\'automne 2026', Wc / 2, 916);
+  }
+  // sceau de cire (doré pour les bêta-testeurs)
+  const cx = Wc / 2 + 10, cy = 985, SB = S.beta;
+  g.fillStyle = SB ? '#1f2b63' : '#8e2a1c'; g.beginPath(); for (let a = 0; a < 24; a++) { const r = a % 2 ? 50 : 56, an = a * Math.PI / 12; g.lineTo(cx + Math.cos(an) * r, cy + Math.sin(an) * r); } g.closePath(); g.fill();
+  g.fillStyle = SB ? '#2e3f8c' : '#b4412b'; g.beginPath(); g.arc(cx, cy, 40, 0, 7); g.fill(); g.strokeStyle = SB ? '#e2ae48' : '#6d1f14'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, 33, 0, 7); g.stroke();
+  g.fillStyle = '#f4d98f'; g.fillRect(cx - 3, cy - 21, 6, 42); g.fillRect(cx - 21, cy - 3, 42, 6); g.fillRect(cx - 8, cy - 8, 16, 16); g.fillStyle = SB ? '#2e3f8c' : '#b4412b'; g.fillRect(cx - 3, cy - 3, 6, 6);
   return c;
 }
 async function certificatePanel(host) {
@@ -2817,6 +2827,7 @@ const Game = {
         <div class="preview"><canvas id="pv" width="18" height="22"></canvas><div class="pname" id="pvName">…</div><div class="pbg" id="pvBg"></div></div>
         <div>
           <div class="field"><label for="nom">Ton nom</label><input type="text" id="nom" maxlength="24" placeholder="Ex. : Caterina, Pieter, Lorenzo…" autocomplete="off" value="${esc(S.name)}" aria-describedby="nomMsg"><div id="nomMsg" class="nommsg" aria-live="polite"></div></div>
+          <div class="field"><label for="code">Code de bêta-testeur <span style="font-weight:400;opacity:.75">(facultatif, si ton enseignant t'en a donné un)</span></label><input type="text" id="code" maxlength="16" autocomplete="off" style="max-width:200px;text-transform:uppercase" value="${S.beta ? '•••••' : ''}" ${S.beta ? 'disabled' : ''}><div id="codeMsg" class="nommsg" aria-live="polite" style="color:var(--ok)">${S.beta ? 'Code accepté : tu es bêta-testeur officiel!' : ''}</div></div>
           <div class="field"><span class="lab">Ta famille</span><div class="bgcards" id="bgs">
             ${Object.keys(BGS).map(k => `<button type="button" class="bgcard" data-bg="${k}" aria-pressed="${S.bg === k}"><b>${BGS[k].label}</b><span>${BGTXT[k].d}</span><span class="adv">${BGTXT[k].a}</span></button>`).join('')}
           </div></div>
@@ -2843,11 +2854,14 @@ const Game = {
     sc.querySelectorAll('#skin .sw').forEach(b => b.onclick = () => { S.look.skin = +b.dataset.i; Snd.blip(); upd(); });
     $('#nom').oninput = () => { const el = $('#nom'), v = Censor.clean(el.value); if (v !== el.value) el.value = v; const bad = Censor.isBad(v); el.classList.toggle('bad', bad); $('#nomMsg').textContent = bad ? "Ce nom n'est pas digne d'un humaniste. Choisis-en un autre." : ''; upd(); }; $('#nom').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); };
     $('#back').onclick = () => Game.title();
+    const codeIn = $('#code');
+    codeIn.oninput = () => { const v = codeIn.value.trim(), m = $('#codeMsg'); if (!v) { m.textContent = ''; return; } if (betaCode(v)) { m.style.color = 'var(--ok)'; m.textContent = 'Code accepté : tu es bêta-testeur officiel!'; Snd.ok(); } else { m.style.color = 'var(--bad)'; m.textContent = v.length >= 5 ? 'Ce code ne fonctionne pas.' : ''; } };
     $('#go').onclick = () => {
       const names = ['Caterina', 'Lorenzo', 'Pieter', 'Margarethe', 'Tomaso', 'Isabella'];
       const v = Censor.clean($('#nom').value).trim();
       if (Censor.isBad(v)) { Snd.bad(); $('#nom').classList.add('bad'); $('#nomMsg').textContent = "Ce nom n'est pas digne d'un humaniste. Choisis-en un autre, par exemple " + names[Math.floor(Math.random() * names.length)] + '.'; $('#nom').focus(); return; }
       S.name = v || names[Math.floor(Math.random() * names.length)];
+      if (betaCode(codeIn.value)) S.beta = true;
       Snd.ok(); Game.intro();
     };
     upd(); setTimeout(() => $('#nom').focus(), 60);
@@ -2958,6 +2972,7 @@ const Game = {
       <p><b>Questions réussies du premier coup :</b> ${first} sur ${q || 0} répondue(s).</p>
       <p><b>Fragments de l'Antiquité :</b> ${nFrags()} sur 3${S.ideas.antiquite ? ' · étoile bonus allumée ★' : ''}.</p>
       ${S.flags.portrait ? `<p><b>Portrait :</b> dessiné au fusain par Albrecht Dürer, à Anvers, en septembre 1520.</p>` : ''}
+      ${S.beta ? '<p><span class="tag" style="background:#1f2b63">Bêta-testeur officiel</span> Tu fais partie des premiers à jouer à ce jeu, avant tout le monde.</p>' : ''}
       <p><b>Ton avantage :</b> ${{ noble: 'ta famille noble t\'a ouvert la tribune de la Seigneurie, à Florence.', religieux: 'ta famille religieuse t\'a ouvert la bibliothèque du couvent, à Cologne.', bourgeois: 'ta famille bourgeoise t\'a ouvert l\'atelier de l\'imprimeur, à Anvers.' }[S.bg]}</p></div></div>`;
       const cp = $('#cp'), g = cp.getContext('2d'); g.drawImage(getSprite(playerLook(), 0, 0), 0, 0);
       if (S.flags.portrait) { cp.style.filter = 'grayscale(1) sepia(.5) contrast(1.2)'; }
@@ -2979,6 +2994,7 @@ const Game = {
       <div class="field"><span class="lab">Son</span><div class="seg"><button type="button" id="mS" aria-pressed="${S.sound}">Effets ${S.sound ? 'activés' : 'coupés'}</button><button type="button" id="mM" aria-pressed="${S.music}">Musique ${S.music ? 'activée' : 'coupée'}</button></div></div>
       <div class="field"><span class="lab">Contrôles tactiles</span><div class="seg"><button type="button" data-tc="auto" aria-pressed="${(S.touch || 'auto') === 'auto'}">Automatique</button><button type="button" data-tc="on" aria-pressed="${S.touch === 'on'}">Toujours afficher</button><button type="button" data-tc="off" aria-pressed="${S.touch === 'off'}">Masquer</button></div></div>
       <p style="font-size:.85em"><b>Clavier :</b> flèches ou ZQSD/WASD pour marcher, Espace ou Entrée pour parler et agir, C pour le carnet, Échap pour ce menu. <b>Souris ou doigt :</b> touche le sol pour t'y rendre, une personne pour lui parler.</p>
+      <div class="field"><span class="lab">Code de bêta-testeur</span>${S.beta ? '<p style="margin:0;color:var(--ok);font-weight:700">Code accepté : tu es bêta-testeur officiel!</p>' : '<div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="mCode" maxlength="16" autocomplete="off" style="font-family:var(--serif);font-size:1em;padding:5px 10px;border:2px solid var(--ink);border-radius:3px;background:#fffaf0;color:var(--ink);text-transform:uppercase;max-width:200px"><button class="btn" type="button" id="mCodeOk">Valider</button></div><div id="mCodeMsg" class="nommsg" aria-live="polite"></div>'}</div>
       <h3>Menu enseignant</h3><p style="font-size:.85em;margin-top:0">Aller directement à une ville (utile en projection). La progression est conservée.</p>
       <div class="btnrow" style="margin-top:4px"><button class="btn" type="button" data-go="florence">Florence</button><button class="btn" type="button" data-go="anvers">Anvers</button><button class="btn" type="button" data-go="cologne">Cologne</button><button class="btn" type="button" data-go="epi">Épilogue</button></div>
       <div class="btnrow"><button class="btn gold" type="button" data-close>Reprendre</button><button class="btn ghost" type="button" id="mT">Écran titre</button><button class="btn ghost" type="button" id="mR">Recommencer du début</button></div><div id="mc"></div>`);
@@ -2988,6 +3004,7 @@ const Game = {
     sh.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { S.touch = b.dataset.tc; Panel.close(); showCityUI(); Game.menu(); });
     sh.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const d = b.dataset.go; Panel.close(); if (d === 'epi') Game.epilogue(); else Game.enterCity(d); });
     $('#mT').onclick = () => { save(); Panel.close(); Game.title(); };
+    if ($('#mCodeOk')) { const ok = () => { if (betaCode($('#mCode').value)) { S.beta = true; save(); Snd.ok(); toast('Code accepté : bêta-testeur officiel!'); Game.menu(); } else { Snd.bad(); $('#mCodeMsg').textContent = 'Ce code ne fonctionne pas.'; } }; $('#mCodeOk').onclick = ok; $('#mCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } }; }
     $('#mR').onclick = () => { $('#mc').innerHTML = `<div class="fb bad">Toute la progression sera effacée. <button class="btn" type="button" id="mR2" style="margin-left:8px">Oui, recommencer</button></div>`; $('#mR2').onclick = () => { clearSave(); const m = S.mode; S = freshState(); S.mode = m; for (const k in cities) delete cities[k]; Panel.close(); Game.create(); }; };
   },
 
@@ -3028,7 +3045,8 @@ const Game = {
       <div class="grid2"><div class="preview" style="min-height:180px"><canvas id="ep" width="18" height="22"></canvas><div class="pname">${esc(S.name)}</div><div class="pbg">${BGS[S.bg].label} · Florence, Anvers, Cologne</div></div>
       <div><p><b>${n} idée(s) humaniste(s) sur 6</b> · ${first} question(s) réussie(s) du premier coup · ${S.docs.length} document(s) historique(s) dans ton carnet.</p>
       ${IDEAS.map(I => `<p style="margin:.2em 0">${S.ideas[I.id] ? '★' : '☆'} <b>${I.name}</b> <span class="tag">${DISC[I.disc].label}</span></p>`).join('')}
-      ${BONUSES.map(I => `<p style="margin:.2em 0">${S.ideas[I.id] ? '★' : '☆'} <b>${I.name}</b> <span class="tag" style="background:#8a5a12">Bonus</span></p>`).join('')}</div></div>
+      ${BONUSES.map(I => `<p style="margin:.2em 0">${S.ideas[I.id] ? '★' : '☆'} <b>${I.name}</b> <span class="tag" style="background:#8a5a12">Bonus</span></p>`).join('')}
+      ${S.beta ? '<p style="margin:.6em 0 0"><span class="tag" style="background:#1f2b63">Bêta-testeur officiel · 2026</span> Merci d\'avoir testé le jeu en primeur! Les erreurs que tu signales aideront les élèves des autres écoles.</p>' : ''}</div></div>
       <div id="certZone"></div>
       <div class="fb info" style="margin-top:12px"><b>Version bêta :</b> tu as remarqué une erreur, un bogue ou une information douteuse? Note-la et signale-la à ton enseignant. Ce jeu est un complément : rien ne vaut un bon cahier de notes de cours pour étudier.</div>
       <h3>Pour ta réflexion (C3)</h3>
