@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les jeux d'histoire de M. Ménard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,700;1,400&family=Pixelify+Sans:wght@500;700&display=swap">
+<style>
+  :root{
+    --night:#0f1433; --lapis:#1f2b63; --lapis2:#2e3f8c; --gold:#e2ae48; --gold2:#f4d98f; --gold3:#a8781f;
+    --parch:#f2e6c8; --parch2:#e6d3a6; --ink:#2a1d13; --ink2:#5a4632;
+    --pix:"Pixelify Sans","Courier New",monospace; --serif:"Alegreya",Georgia,serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#1d2a66 0%,var(--night) 60%);color:var(--parch);font-family:var(--serif);font-size:17px;line-height:1.5}
+  .wrap{max-width:1040px;margin:0 auto;padding:40px 16px 56px}
+  header{text-align:center;margin-bottom:34px}
+  .kicker{font-family:var(--pix);letter-spacing:.25em;text-transform:uppercase;color:var(--parch2);font-size:13px}
+  h1{font-family:var(--pix);font-weight:700;color:var(--gold2);font-size:clamp(32px,6vw,56px);line-height:1.05;margin:.25em 0;text-shadow:0 4px 0 #6b4a12}
+  header p{max-width:60ch;margin:0 auto;color:var(--parch)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px}
+  .card{background:var(--parch);color:var(--ink);border:3px solid var(--ink);border-radius:4px;box-shadow:0 0 0 3px var(--gold3),0 8px 0 3px #000;display:flex;flex-direction:column;overflow:hidden}
+  .card .art{height:120px;background:linear-gradient(#0a0f2c,#2e3f8c);position:relative;overflow:hidden}
+  .card .art canvas{width:100%;height:100%;image-rendering:pixelated;display:block}
+  .card .body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font-family:var(--pix);font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--lapis);color:var(--parch);padding:2px 7px;border-radius:2px}
+  .tag.beta{background:#b4412b}
+  .card h2{font-family:var(--pix);font-weight:700;color:var(--lapis);font-size:22px;margin:0;line-height:1.1}
+  .card p{margin:0;font-size:15.5px}
+  .meta{font-size:13.5px;color:var(--ink2);font-style:italic}
+  .play{margin-top:auto;align-self:flex-start;font-family:var(--pix);font-weight:700;font-size:16px;background:var(--gold);color:var(--ink);border:2px solid var(--ink);border-radius:3px;padding:8px 18px;box-shadow:0 3px 0 var(--ink);text-decoration:none}
+  .play:hover{background:var(--gold2)}
+  .play:focus-visible{outline:3px solid var(--gold2);outline-offset:3px}
+  .soon{border-style:dashed;opacity:.75}
+  footer{margin-top:40px;text-align:center;font-size:14px;color:var(--parch2)}
+  footer b{font-family:var(--pix);color:var(--gold2);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">École Joseph-François-Perrault · Histoire</div>
+    <h1>Les jeux d'histoire<br>de M. Ménard</h1>
+    <p>Des jeux pour explorer le passé à partir de vrais documents historiques. Choisis un jeu, puis laisse-toi guider. Ta partie est sauvegardée dans ce navigateur.</p>
+  </header>
+
+  <main class="grid" id="jeux"></main>
+
+  <footer>
+    <p><b>Version bêta.</b> Tu as trouvé une erreur, un bogue ou une information douteuse? Signale-la à ton enseignant.<br>Et n'oublie pas : rien ne vaut un bon cahier de notes de cours!</p>
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   LISTE DES JEUX — pour ajouter un jeu, copie un bloc { … }
+   et mets son dossier à côté de ce fichier.
+   ========================================================= */
+const JEUX = [
+  {
+    titre: "Le Ciel des humanistes",
+    dossier: "ciel-des-humanistes/",
+    niveau: "Secondaire 2",
+    chapitre: "Chapitre 1 · Renaissance et humanisme",
+    duree: "Environ 25 minutes",
+    resume: "Crée ton humaniste et voyage à Florence, à Anvers et à Cologne. Allume les six étoiles des idées humanistes, et deux étoiles bonus si tu es curieux.",
+    beta: true,
+    ciel: true
+  }
+  // , { titre: "Prochain jeu", dossier: "prochain-jeu/", niveau: "Secondaire 4", chapitre: "…", duree: "…", resume: "…" }
+];
+
+const grille = document.getElementById('jeux');
+JEUX.forEach((j, k) => {
+  const a = document.createElement('article'); a.className = 'card';
+  a.innerHTML = `<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
+    <div class="body">
+      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}</div>
+      <h2>${j.titre}</h2>
+      <p>${j.resume}</p>
+      <div class="meta">${j.chapitre} · ${j.duree}</div>
+      <a class="play" href="${j.dossier}">Jouer ▶</a>
+    </div>`;
+  grille.appendChild(a);
+  dessinerCiel(a.querySelector('canvas'), k + 1);
+});
+// petit ciel étoilé en pixel art pour l'illustration de chaque carte
+function dessinerCiel(c, graine) {
+  const g = c.getContext('2d'); let s = graine * 9301;
+  const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(255,248,225,${.3 + rnd() * .7})`; g.fillRect(rnd() * 160 | 0, rnd() * 46 | 0, 1, 1); }
+  const etoile = (x, y, col) => { g.fillStyle = col; g.fillRect(x - 3, y, 7, 1); g.fillRect(x, y - 3, 1, 7); g.fillRect(x - 1, y - 1, 3, 3); g.fillStyle = '#fffbe8'; g.fillRect(x, y, 1, 1); };
+  [[80, 12, '#f6c28b'], [62, 22, '#9fe0d0'], [98, 22, '#cdbdff'], [80, 30, '#f6c28b'], [70, 42, '#cdbdff'], [90, 42, '#cdbdff'], [64, 6, '#ffcf5a'], [96, 6, '#ff9f80']].forEach(e => etoile(...e));
+  g.fillStyle = '#0b0d22'; g.fillRect(0, 52, 160, 8);
+  for (let x = 0; x < 160; x++) { const h = 4 + Math.sin(x * .07) * 2; g.fillRect(x, 52 - h, 1, h); }
+  g.fillRect(20, 36, 18, 16); for (let y = 0; y < 9; y++) { const w = Math.sqrt(1 - (y / 9) ** 2) * 9; g.fillRect(29 - w, 36 - 9 + y, w * 2, 1); }
+  g.fillRect(128, 30, 8, 22); g.fillRect(131, 18, 2, 12);
+}
+</script>
+</body>
+</html>
