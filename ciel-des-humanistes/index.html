@@ -305,7 +305,7 @@ function freshState() {
   };
 }
 let S = freshState();
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { } }
+function save() { if (!S.name) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { } }  // sans nom (écran titre), on n'écrase pas la partie sauvegardée
 function loadSave() { try { const t = localStorage.getItem(SAVE_KEY); if (!t) return null; return migrateSave(JSON.parse(t)); } catch (e) { return null; } }
 // Les parties commencées avec l'ancienne version (v1) gardent les étoiles dont l'activité n'a pas changé
 function migrateSave(o) {
@@ -323,6 +323,18 @@ function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } 
 function B(o) { return (o && (o[S.bg] ?? o.def)) ?? ''; }   // texte selon le background
 // Code de bêta-testeur donné en classe par l'enseignant
 function betaCode(v) { try { return btoa(String(v || '').trim().toUpperCase()) === 'WUFOT1U='; } catch (e) { return false; } }
+// Accès enseignant (mode classe + téléportation) : verrouillé par un code, mémorisé seulement sur l'appareil où il a été entré.
+// Le code n'apparaît pas en clair dans le fichier : on compare son empreinte SHA-256.
+const PROF_KEY = 'ciel-humanistes-prof', PROF_HASH = 'c75819aeb0f0a7e8d20fe3a9299dca7ee6f190d8329c79076c848f34d6ae70ab';
+function isProf() { try { return localStorage.getItem(PROF_KEY) === PROF_HASH; } catch (e) { return false; } }
+async function profCode(v) {
+  try {
+    const t = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+    return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('') === PROF_HASH;
+  } catch (e) { return false; }
+}
+function setProf(on) { try { if (on) localStorage.setItem(PROF_KEY, PROF_HASH); else localStorage.removeItem(PROF_KEY); } catch (e) { } applyMode(); }
 function addDoc(id) { if (!S.docs.includes(id)) { S.docs.push(id); toast('Document ajouté au carnet'); save(); } }
 
 let toastT = 0;
@@ -2781,20 +2793,42 @@ const Game = {
       <div class="menu">
         ${has ? `<button class="btn gold" type="button" id="bCont">Continuer la partie</button>` : ''}
         <button class="btn ${has ? '' : 'gold'}" type="button" id="bNew">Nouvelle partie</button>
-        <div class="modes" role="group" aria-label="Mode de jeu">
+        ${isProf() ? `<div class="modes" role="group" aria-label="Mode de jeu">
           <button type="button" data-m="solo" aria-pressed="${S.mode === 'solo'}">Mode solo</button>
           <button type="button" data-m="classe" aria-pressed="${S.mode === 'classe'}">Mode classe (projection)</button>
-        </div>
+        </div>` : ''}
       </div>
       <div class="betanote"><b>Version bêta.</b> On teste ce jeu en classe pour y trouver les erreurs : si tu en vois une, signale-la à ton enseignant. Et n'oublie pas : rien ne vaut un bon cahier de notes de cours!</div>
       <div class="foot">Histoire · Secondaire 2 · Chapitre 1 : Le renouvellement de la vision de l'homme</div>
-      <div class="credit">D'après les notes de cours de M. Ménard (Montréal) · Programmé avec Claude, un modèle de langage d'Anthropic · <button type="button" class="linkbtn" id="bAbout">À propos</button></div>
+      <div class="credit">D'après les notes de cours de M. Ménard (Montréal) · Programmé avec Claude, un modèle de langage d'Anthropic · <button type="button" class="linkbtn" id="bAbout">À propos</button> · <button type="button" class="linkbtn" id="bProf">${isProf() ? 'Mode enseignant activé' : 'Accès enseignant'}</button></div>
     </div>`;
     sc.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { S.mode = b.dataset.m; applyMode(); sc.querySelectorAll('[data-m]').forEach(x => x.setAttribute('aria-pressed', x.dataset.m === S.mode)); Snd.init(); Snd.sel(); });
     $('#bAbout').onclick = () => { Snd.init(); Snd.sel(); Game.about(); };
+    $('#bProf').onclick = () => { Snd.init(); Snd.sel(); Game.profAccess(); };
     $('#bNew').onclick = () => { Snd.init(); Snd.setMusic(S.music); Snd.sel(); const m = S.mode; S = freshState(); S.mode = m; for (const k in cities) delete cities[k]; Game.create(); };
     if (has) $('#bCont').onclick = () => { Snd.init(); Snd.sel(); const m = S.mode; S = loadSave(); S.mode = m; applyMode(); Snd.setMusic(S.music); for (const k in cities) delete cities[k]; Game.resume(); };
     setTimeout(() => { const b = sc.querySelector('.btn.gold'); if (b) b.focus(); }, 50);
+  },
+  profAccess() {
+    if (isProf()) {
+      const sh = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">Accès enseignant</div><h2>Mode enseignant activé</h2>
+        <p>Sur cet appareil, le mode classe et le menu enseignant (aller directement à une ville) sont débloqués.</p>
+        <p style="font-size:.9em">Pense à le désactiver si un élève doit utiliser cet ordinateur après toi.</p>
+        <div class="btnrow"><button class="btn gold" type="button" data-close>Retour</button><button class="btn ghost" type="button" id="pOff">Désactiver sur cet appareil</button></div>`, () => { if (S.scene === 'title') Game.title(); });
+      sh.querySelector('#pOff').onclick = () => { setProf(false); toast('Mode enseignant désactivé'); Panel.close(); };
+      return;
+    }
+    const sh = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">Accès enseignant</div><h2>Réservé à l'enseignant</h2>
+      <p>Le mode classe (projection, votes, minuteur) et le menu pour aller directement à une ville sont réservés à l'enseignant.</p>
+      <div class="field"><label for="pCode">Code enseignant</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input type="password" id="pCode" maxlength="24" autocomplete="off" style="max-width:240px"><button class="btn gold" type="button" id="pOk">Valider</button></div><div id="pMsg" class="nommsg" aria-live="polite"></div></div>
+      <div class="btnrow"><button class="btn ghost" type="button" data-close>Retour</button></div>`, () => { if (S.scene === 'title') Game.title(); });
+    const inp = sh.querySelector('#pCode');
+    const ok = async () => {
+      if (await profCode(inp.value)) { setProf(true); Snd.ok(); toast('Mode enseignant activé sur cet appareil'); Panel.close(); }
+      else { Snd.bad(); sh.querySelector('#pMsg').textContent = 'Code incorrect.'; inp.select(); }
+    };
+    sh.querySelector('#pOk').onclick = ok; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } };
+    setTimeout(() => inp.focus(), 60);
   },
   about() {
     Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">À propos</div><h2>Comment ce jeu a été fait</h2>
@@ -2990,19 +3024,20 @@ const Game = {
   menu() {
     if (S.scene !== 'city') return;
     const sh = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">Pause</div><h2>Menu</h2>
-      <div class="field"><span class="lab">Mode de jeu</span><div class="seg"><button type="button" data-m="solo" aria-pressed="${S.mode === 'solo'}">Solo</button><button type="button" data-m="classe" aria-pressed="${S.mode === 'classe'}">Classe (texte agrandi, votes, minuteur)</button></div></div>
+      ${isProf() ? `<div class="field"><span class="lab">Mode de jeu</span><div class="seg"><button type="button" data-m="solo" aria-pressed="${S.mode === 'solo'}">Solo</button><button type="button" data-m="classe" aria-pressed="${S.mode === 'classe'}">Classe (texte agrandi, votes, minuteur)</button></div></div>` : ''}
       <div class="field"><span class="lab">Son</span><div class="seg"><button type="button" id="mS" aria-pressed="${S.sound}">Effets ${S.sound ? 'activés' : 'coupés'}</button><button type="button" id="mM" aria-pressed="${S.music}">Musique ${S.music ? 'activée' : 'coupée'}</button></div></div>
       <div class="field"><span class="lab">Contrôles tactiles</span><div class="seg"><button type="button" data-tc="auto" aria-pressed="${(S.touch || 'auto') === 'auto'}">Automatique</button><button type="button" data-tc="on" aria-pressed="${S.touch === 'on'}">Toujours afficher</button><button type="button" data-tc="off" aria-pressed="${S.touch === 'off'}">Masquer</button></div></div>
       <p style="font-size:.85em"><b>Clavier :</b> flèches ou ZQSD/WASD pour marcher, Espace ou Entrée pour parler et agir, C pour le carnet, Échap pour ce menu. <b>Souris ou doigt :</b> touche le sol pour t'y rendre, une personne pour lui parler.</p>
       <div class="field"><span class="lab">Code de bêta-testeur</span>${S.beta ? '<p style="margin:0;color:var(--ok);font-weight:700">Code accepté : tu es bêta-testeur officiel!</p>' : '<div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="mCode" maxlength="16" autocomplete="off" style="font-family:var(--serif);font-size:1em;padding:5px 10px;border:2px solid var(--ink);border-radius:3px;background:#fffaf0;color:var(--ink);text-transform:uppercase;max-width:200px"><button class="btn" type="button" id="mCodeOk">Valider</button></div><div id="mCodeMsg" class="nommsg" aria-live="polite"></div>'}</div>
-      <h3>Menu enseignant</h3><p style="font-size:.85em;margin-top:0">Aller directement à une ville (utile en projection). La progression est conservée.</p>
-      <div class="btnrow" style="margin-top:4px"><button class="btn" type="button" data-go="florence">Florence</button><button class="btn" type="button" data-go="anvers">Anvers</button><button class="btn" type="button" data-go="cologne">Cologne</button><button class="btn" type="button" data-go="epi">Épilogue</button></div>
+      ${isProf() ? `<h3>Menu enseignant</h3><p style="font-size:.85em;margin-top:0">Aller directement à une ville (utile en projection). La progression est conservée.</p>
+      <div class="btnrow" style="margin-top:4px"><button class="btn" type="button" data-go="florence">Florence</button><button class="btn" type="button" data-go="anvers">Anvers</button><button class="btn" type="button" data-go="cologne">Cologne</button><button class="btn" type="button" data-go="epi">Épilogue</button><button class="btn ghost" type="button" id="mProfOff">Désactiver le mode enseignant</button></div>` : ''}
       <div class="btnrow"><button class="btn gold" type="button" data-close>Reprendre</button><button class="btn ghost" type="button" id="mT">Écran titre</button><button class="btn ghost" type="button" id="mR">Recommencer du début</button></div><div id="mc"></div>`);
     sh.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { S.mode = b.dataset.m; applyMode(); Game.menu(); });
     $('#mS').onclick = () => { S.sound = !S.sound; Game.menu(); };
     $('#mM').onclick = () => { S.music = !S.music; Snd.setMusic(S.music); Game.menu(); };
     sh.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { S.touch = b.dataset.tc; Panel.close(); showCityUI(); Game.menu(); });
     sh.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { const d = b.dataset.go; Panel.close(); if (d === 'epi') Game.epilogue(); else Game.enterCity(d); });
+    if ($('#mProfOff')) $('#mProfOff').onclick = () => { setProf(false); toast('Mode enseignant désactivé'); Game.menu(); };
     $('#mT').onclick = () => { save(); Panel.close(); Game.title(); };
     if ($('#mCodeOk')) { const ok = () => { if (betaCode($('#mCode').value)) { S.beta = true; save(); Snd.ok(); toast('Code accepté : bêta-testeur officiel!'); Game.menu(); } else { Snd.bad(); $('#mCodeMsg').textContent = 'Ce code ne fonctionne pas.'; } }; $('#mCodeOk').onclick = ok; $('#mCode').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } }; }
     $('#mR').onclick = () => { $('#mc').innerHTML = `<div class="fb bad">Toute la progression sera effacée. <button class="btn" type="button" id="mR2" style="margin-left:8px">Oui, recommencer</button></div>`; $('#mR2').onclick = () => { clearSave(); const m = S.mode; S = freshState(); S.mode = m; for (const k in cities) delete cities[k]; Panel.close(); Game.create(); }; };
@@ -3074,7 +3109,7 @@ function showCityUI() {
   $('#touch').hidden = !(t === 'on' || (t === 'auto' && isTouch));
 }
 function hideCityUI() { $('#hud').hidden = true; $('#touch').hidden = true; $('#hint').hidden = true; }
-function applyMode(noSave) { document.body.classList.toggle('classe', S.mode === 'classe'); if (!noSave && S.name) save(); }
+function applyMode(noSave) { if (S.mode === 'classe' && !isProf()) S.mode = 'solo'; document.body.classList.toggle('classe', S.mode === 'classe'); if (!noSave && S.name) save(); }
 $('#btnCarnet').onclick = () => { Snd.init(); Game.carnet(); };
 $('#btnMenu').onclick = () => { Snd.init(); Game.menu(); };
 onAction = () => { Snd.init(); if (Dialog.open) { Dialog.advance(); return; } doAction(); };
