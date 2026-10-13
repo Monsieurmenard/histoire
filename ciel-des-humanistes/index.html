@@ -105,6 +105,22 @@ body.classe .classbar{display:flex;}
 .timer{font-family:var(--pix);font-size:1.1em;min-width:3ch;color:var(--vermil);}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
 @media (max-width:760px){.grid2{grid-template-columns:1fr;}}
+.doc.coll{border-left-color:#2f8a66;}
+.mottos{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}
+.motto{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font-family:var(--serif);background:var(--parch2);color:var(--ink);border:2px solid var(--ink2);border-radius:3px;padding:7px 10px;}
+.motto b{font-family:var(--pix);font-weight:600;color:var(--lapis);}
+.motto span{font-size:.9em;}
+.motto em{font-size:.75em;color:var(--ink2);}
+.motto[aria-pressed="true"]{background:var(--lapis);border-color:var(--ink);}
+.motto[aria-pressed="true"] b,.motto[aria-pressed="true"] span,.motto[aria-pressed="true"] em{color:var(--parch);}
+.emblems{display:flex;flex-wrap:wrap;gap:8px;}
+.emblem{display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--serif);font-size:.8em;background:var(--parch2);color:var(--ink);border:2px solid var(--ink2);border-radius:3px;padding:6px 8px;min-width:82px;}
+.emblem[aria-pressed="true"]{background:#f4d98f;border-color:var(--ink);box-shadow:0 0 0 2px var(--lapis);}
+canvas.emb{width:36px;height:36px;image-rendering:pixelated;}
+.mapdock{position:sticky;top:0;z-index:1;padding:0 0 6px;}
+.mapdock .mini{width:min(100%, calc(min(38vh, 230px) * 320 / 170));margin:0 auto;}
+.mapdock p{font-size:.8em;color:var(--ink2);margin:6px 0 0;text-align:center;}
+@media (max-width:760px){.mapdock{background:var(--parch);box-shadow:0 6px 8px -6px rgba(40,25,10,.35);}.mapdock .mini{width:min(100%, calc(20vh * 320 / 170));}.mapdock p{display:none;}}
 .mini{width:100%;image-rendering:pixelated;border:3px solid var(--ink);border-radius:2px;background:#000;display:block;touch-action:none;}
 .cards{display:grid;grid-template-columns:repeat(auto-fit, minmax(190px,1fr));gap:10px;margin-top:10px;}
 .card{font-family:var(--serif);font-size:.9em;text-align:left;background:#fbf5e3;border:2px solid var(--ink2);border-radius:3px;padding:10px 12px;color:var(--ink);}
@@ -299,8 +315,8 @@ function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 const SAVE_KEY = 'ciel-humanistes-v1';
 function freshState() {
   return {
-    v: 2, name: '', bg: 'noble', look: { outfit: 'pourpoint', hair: 1, skin: 1 },
-    scene: 'title', city: 'florence', ideas: {}, frags: {}, flags: {}, docs: [], tries: {}, firstTry: {},
+    v: 2, name: '', bg: 'noble', look: { outfit: 'pourpoint', hair: 1, skin: 1, hat: 'famille', hairLen: null, beard: false }, latin: '', latinChosen: false, motto: null, emblem: null,
+    scene: 'title', city: 'florence', ideas: {}, frags: {}, coll: {}, flags: {}, docs: [], tries: {}, firstTry: {},
     mode: 'solo', sound: true, music: true, pos: null, reflect: null
   };
 }
@@ -316,7 +332,7 @@ function migrateSave(o) {
     o.ideas = ni; o.frags = {}; o.v = 2;
   }
   if (o.v !== 2) return null;
-  o.frags = o.frags || {}; o.ideas = o.ideas || {};
+  o.frags = o.frags || {}; o.ideas = o.ideas || {}; o.coll = o.coll || {}; o.look = Object.assign({ outfit: 'pourpoint', hair: 1, skin: 1, hat: 'famille', hairLen: null, beard: false }, o.look || {}); if (o.latin === undefined) o.latin = '';
   return o;
 }
 function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } }
@@ -335,6 +351,9 @@ async function profCode(v) {
   } catch (e) { return false; }
 }
 function setProf(on) { try { if (on) localStorage.setItem(PROF_KEY, PROF_HASH); else localStorage.removeItem(PROF_KEY); } catch (e) { } applyMode(); }
+// documents réservés à une famille (l'avantage du milieu social) : une partie en donne un seul des trois
+const FAMILY_DOC = { noble: 'filarete', religieux: 'obscurs', bourgeois: 'utopia' };
+function docsReachable() { const fam = Object.values(FAMILY_DOC); return Object.keys(DOCS).filter(k => !fam.includes(k) || FAMILY_DOC[S.bg] === k); }
 function addDoc(id) { if (!S.docs.includes(id)) { S.docs.push(id); toast('Document ajouté au carnet'); save(); } }
 
 let toastT = 0;
@@ -356,6 +375,14 @@ const Snd = {
   bad() { this.tone(196, .2, 'sawtooth', .035); this.tone(147, .25, 'sawtooth', .03, .08); },
   star() { [784, 988, 1175, 1568, 1976].forEach((f, i) => this.tone(f, .5, 'triangle', .06, i * .09)); [392, 494, 587].forEach((f, i) => this.tone(f, 1.1, 'sine', .05, .3 + i * .02)); },
   bump() { this.tone(110, .05, 'square', .03); },
+  // un petit air de luth, cordes pincées (mode de ré)
+  lute() {
+    if (!this.ac || !S.sound) return;
+    const N = { D3: 146.8, A2: 110, D4: 293.7, E4: 329.6, F4: 349.2, G4: 392, A4: 440, C5: 523.3, D5: 587.3 };
+    const mel = [['A4', 1], ['A4', 1], ['G4', 1], ['F4', 1], ['G4', 2], ['A4', 2], ['D5', 1], ['C5', 1], ['A4', 1], ['G4', 1], ['A4', 2], ['F4', 1], ['E4', 1], ['D4', 4]];
+    let t = .05; const u = .2;
+    mel.forEach(([n, d], i) => { const f = N[n]; this.tone(f, .9, 'triangle', .07, t); this.tone(f * 2, .25, 'sawtooth', .012, t); if (i % 4 === 0) this.tone(i % 8 ? N.A2 : N.D3, 1.4, 'triangle', .05, t); t += d * u; });
+  },
   // petite musique de luth (mode dorien) jouée en boucle
   scales: {
     title: [293.7, 349.2, 392, 440, 523.3, 587.3], florence: [293.7, 329.6, 349.2, 392, 440, 493.9, 523.3, 587.3],
@@ -404,6 +431,8 @@ let onAction = () => { }, onEscape = () => { }, onCarnet = () => { };
 window.addEventListener('keydown', e => {
   const tag = (e.target && e.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  // touche d'action maintenue enfoncée : on ignore la répétition automatique (sinon on interagit à l'infini)
+  if (e.repeat && (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'KeyE')) { e.preventDefault(); return; }
   const d = KEYMAP[e.code];
   // navigation dans les choix de dialogue (évite qu'un Espace répété choisisse par accident)
   if (typeof Dialog !== 'undefined' && Dialog.open && Dialog.cur && Dialog.cur.choice && !Dialog.typing && !panelOpen()) {
@@ -447,7 +476,11 @@ const BGS = {
 };
 function playerLook() {
   const b = BGS[S.bg];
-  return { skin: SKINS[S.look.skin], hair: HAIRS[S.look.hair], top: b.top, top2: b.top2, trim: b.trim, bottom: b.bottom, hat: b.hat, hatc: b.hatc, robe: S.look.outfit === 'robe', long: S.look.outfit === 'robe' };
+  const lk = S.look, hk = lk.hat && lk.hat !== 'famille' ? lk.hat : b.hat;
+  const L = { skin: SKINS[lk.skin], hair: HAIRS[lk.hair], top: b.top, top2: b.top2, trim: b.trim, bottom: b.bottom, hatc: b.hatc, robe: lk.outfit === 'robe', long: lk.hairLen ? lk.hairLen === 'long' : lk.outfit === 'robe' };
+  if (hk !== 'none') L.hat = hk;
+  if (lk.beard) L.beard = shade(HAIRS[lk.hair], -.15);
+  return L;
 }
 
 /* ---------- Générateur de sprites (chibi 16×20, contour sombre) ---------- */
@@ -636,41 +669,54 @@ async function drawCertificate() {
   g.imageSmoothingEnabled = false; g.drawImage(getSprite(playerLook(), 0, 0), 0, 0, 18, 18, px - 27, py + 3, 54, 54);
   g.strokeStyle = '#a8781f'; g.lineWidth = 2; g.beginPath(); g.moveTo(Wc / 2 - 420, 540); g.lineTo(Wc / 2 + 420, 540); g.stroke();
   g.fillStyle = '#2a1d13'; g.font = `28px ${AL}`;
-  g.fillText(`${BGS[S.bg].label}, a parcouru Florence (1504), Anvers et Cologne (1520)`, Wc / 2, 590);
-  g.fillText("et allumé les six étoiles de l'humanisme :", Wc / 2, 628);
-  // les six idées, en deux colonnes
+  // nom d'humaniste (latin) sous le nom
+  let yy = 590;
+  if (S.latin && S.latin.trim().toLowerCase() !== S.name.trim().toLowerCase()) { g.fillStyle = '#7a2a18'; g.font = `italic 30px ${FELL}`; g.fillText(`Nom d'humaniste : ${S.latin}`, Wc / 2, 580); yy = 622; }
+  g.fillStyle = '#2a1d13'; g.font = `28px ${AL}`;
+  g.fillText(`${BGS[S.bg].label}, a parcouru Florence (1504), Anvers et Cologne (1520)`, Wc / 2, yy);
+  g.fillText("et allumé les six étoiles de l'humanisme :", Wc / 2, yy + 36);
+  // les six idées, en trois colonnes
   g.textAlign = 'left'; g.font = `600 25px ${AL}`;
+  const iy = yy + 78;
   IDEAS.forEach((I, i) => {
-    const col = i % 2, row = i >> 1, x = col ? Wc / 2 + 50 : Wc / 2 - 520, y = 676 + row * 50;
+    const col = i % 3, row = Math.floor(i / 3), x = Wc / 2 - 560 + col * 390, y = iy + row * 52;
     g.fillStyle = shade(DISC[I.disc].color, -.3); g.fillRect(x, y - 16, 4, 20); g.fillRect(x - 8, y - 8, 20, 4); g.fillRect(x - 2, y - 10, 8, 8);
     g.fillStyle = '#1f2b63'; g.fillText(I.name, x + 26, y);
-    g.fillStyle = '#5a4632'; g.font = `italic 20px ${FELL}`; g.fillText(DISC[I.disc].label, x + 26 + g.measureText('').width, y + 24); g.font = `600 25px ${AL}`;
+    g.fillStyle = '#5a4632'; g.font = `italic 20px ${FELL}`; g.fillText(DISC[I.disc].label, x + 26, y + 24); g.font = `600 25px ${AL}`;
   });
-  { const eb = BONUSES.filter(b => S.ideas[b.id]); if (eb.length) { g.textAlign = 'center'; g.fillStyle = '#8a5a12'; g.font = `600 24px ${AL}`; g.fillText(`★  ${eb.length > 1 ? 'Étoiles bonus' : 'Étoile bonus'} : ${eb.map(b => b.name).join('  ·  ')}`, Wc / 2, 846); } }
+  { const eb = BONUSES.filter(b => S.ideas[b.id]); if (eb.length) { g.textAlign = 'center'; g.fillStyle = '#8a5a12'; g.font = `600 24px ${AL}`; g.fillText(`★  ${eb.length > 1 ? 'Étoiles bonus' : 'Étoile bonus'} : ${eb.map(b => b.name).join('  ·  ')}`, Wc / 2, iy + 112); } }
+  // devise
+  const M = MOTTO[S.motto];
+  if (M) { g.textAlign = 'center'; g.fillStyle = '#1f2b63'; g.font = `italic 34px ${FELL}`; const t1 = `« ${M.la} »`; const w1 = g.measureText(t1).width; g.font = `italic 24px ${FELL}`; const t2 = `  ${M.fr}`; const w2 = g.measureText(t2).width; const x0 = Wc / 2 - (w1 + w2) / 2;
+    g.textAlign = 'left'; g.font = `italic 34px ${FELL}`; g.fillText(t1, x0, iy + 152); g.fillStyle = '#5a4632'; g.font = `italic 24px ${FELL}`; g.fillText(t2, x0 + w1, iy + 152); }
   // statistiques
   const first = firstTryCount();
-  g.textAlign = 'center'; g.fillStyle = '#5a4632'; g.font = `italic 24px ${FELL}`;
-  g.fillText(`Questions réussies du premier coup : ${first} sur 6  ·  Documents historiques consultés : ${S.docs.length} sur ${Object.keys(DOCS).length}`, Wc / 2, 880);
+  g.textAlign = 'center'; g.fillStyle = '#5a4632'; g.font = `italic 22px ${FELL}`;
+  g.fillText(`Questions réussies du premier coup : ${first} sur 6  ·  Documents historiques consultés : ${S.docs.length} sur ${docsReachable().length}`, Wc / 2, 894);
+  // mentions spéciales (bêta-testeur, collectionneur) sur une même ligne
+  { const parts = []; if (S.beta) parts.push(['Bêta-testeur officiel, automne 2026', '#1f2b63']); if (nColl() === COLL.length) parts.push(["◆ Collectionneur d'antiques : les dix pièces du cabinet", '#2f6b5a']);
+    if (parts.length) { g.font = `600 22px ${AL}`; const sep = '   ·   '; const tot = parts.reduce((a, p, i) => a + g.measureText(p[0]).width + (i ? g.measureText(sep).width : 0), 0); let x = Wc / 2 - tot / 2; g.textAlign = 'left';
+      parts.forEach((p, i) => { if (i) { g.fillStyle = '#8a7658'; g.fillText(sep, x, 931); x += g.measureText(sep).width; } g.fillStyle = p[1]; g.fillText(p[0], x, 931); x += g.measureText(p[0]).width; }); } }
   // pied : date, école, signature
   g.textAlign = 'left'; g.fillStyle = '#2a1d13'; g.font = `26px ${AL}`;
-  g.fillText(`Fait le ${certDate()}`, 150, 975);
-  g.fillStyle = '#5a4632'; g.font = `italic 22px ${FELL}`; g.fillText('École Joseph-François-Perrault · Histoire, secondaire 2', 150, 1010);
-  g.fillText('Chapitre 1 : Le renouvellement de la vision de l\'homme', 150, 1040);
-  g.textAlign = 'center'; g.strokeStyle = '#2a1d13'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(Wc - 520, 985); g.lineTo(Wc - 170, 985); g.stroke();
-  g.fillStyle = '#2a1d13'; g.font = `24px ${AL}`; g.fillText('M. Ménard, enseignant', Wc - 345, 1018);
+  g.fillText(`Fait le ${certDate()}`, 150, 985);
+  g.fillStyle = '#5a4632'; g.font = `italic 22px ${FELL}`; g.fillText('École Joseph-François-Perrault · Histoire, secondaire 2', 150, 1018);
+  g.fillText('Chapitre 1 : Le renouvellement de la vision de l\'homme', 150, 1046);
+  g.textAlign = 'center'; g.strokeStyle = '#2a1d13'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(Wc - 520, 995); g.lineTo(Wc - 170, 995); g.stroke();
+  g.fillStyle = '#2a1d13'; g.font = `24px ${AL}`; g.fillText('M. Ménard, enseignant', Wc - 345, 1028);
   // ruban de bêta-testeur
   if (S.beta) {
     g.save(); g.translate(Wc - 230, 190); g.rotate(Math.PI / 4);
     g.fillStyle = '#1f2b63'; g.fillRect(-260, -30, 520, 60); g.fillStyle = '#e2ae48'; g.fillRect(-260, -30, 520, 5); g.fillRect(-260, 25, 520, 5);
     g.fillStyle = '#f4d98f'; g.textAlign = 'center'; g.font = `700 26px ${PIX}`; g.fillText('BÊTA-TESTEUR · 2026', 0, 9);
     g.restore();
-    g.textAlign = 'center'; g.fillStyle = '#1f2b63'; g.font = `italic 22px ${FELL}`; g.fillText('Bêta-testeur officiel : parmi les premiers élèves à avoir exploré ce jeu, à l\'automne 2026', Wc / 2, 916);
   }
-  // sceau de cire (doré pour les bêta-testeurs)
-  const cx = Wc / 2 + 10, cy = 985, SB = S.beta;
+  // sceau de cire (doré pour les bêta-testeurs), avec l'emblème choisi
+  const cx = Wc / 2 + 10, cy = 996, SB = S.beta;
   g.fillStyle = SB ? '#1f2b63' : '#8e2a1c'; g.beginPath(); for (let a = 0; a < 24; a++) { const r = a % 2 ? 50 : 56, an = a * Math.PI / 12; g.lineTo(cx + Math.cos(an) * r, cy + Math.sin(an) * r); } g.closePath(); g.fill();
   g.fillStyle = SB ? '#2e3f8c' : '#b4412b'; g.beginPath(); g.arc(cx, cy, 40, 0, 7); g.fill(); g.strokeStyle = SB ? '#e2ae48' : '#6d1f14'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, 33, 0, 7); g.stroke();
-  g.fillStyle = '#f4d98f'; g.fillRect(cx - 3, cy - 21, 6, 42); g.fillRect(cx - 21, cy - 3, 42, 6); g.fillRect(cx - 8, cy - 8, 16, 16); g.fillStyle = SB ? '#2e3f8c' : '#b4412b'; g.fillRect(cx - 3, cy - 3, 6, 6);
+  if (EMBLEMS[S.emblem]) drawEmblem(g, S.emblem, cx, cy, 5, '#f4d98f');
+  else { g.fillStyle = '#f4d98f'; g.fillRect(cx - 3, cy - 21, 6, 42); g.fillRect(cx - 21, cy - 3, 42, 6); g.fillRect(cx - 8, cy - 8, 16, 16); g.fillStyle = SB ? '#2e3f8c' : '#b4412b'; g.fillRect(cx - 3, cy - 3, 6, 6); }
   return c;
 }
 async function certificatePanel(host) {
@@ -1385,10 +1431,12 @@ function renderCity(t) {
     if (n.hidden && n.hidden()) continue;
     const m = n.mark && n.mark(); if (!m) continue;
     const bx = n.x * TS - cam.x + 7, by = n.y * TS - cam.y - 12 + Math.round(Math.sin(t * 4) * 1.5);
+    if (m === 'c') { ctx.fillStyle = '#140d0a'; ctx.fillRect(bx - 3, by, 7, 7); ctx.fillStyle = '#8ef0c4'; ctx.fillRect(bx, by + 1, 1, 5); ctx.fillRect(bx - 2, by + 3, 5, 1); ctx.fillRect(bx - 1, by + 2, 3, 3); continue; }
     ctx.fillStyle = '#140d0a'; ctx.fillRect(bx - 2, by - 1, 5, 9);
     ctx.fillStyle = m === '!' ? '#f4d98f' : '#9fd0ff'; ctx.fillRect(bx - 1, by, 3, 5); ctx.fillRect(bx - 1, by + 6, 3, 1);
   }
-  for (const [k, tr] of city.trig) { if (!tr.mark || !tr.mark()) continue; const [x, y] = k.split(',').map(Number); const bx = x * TS - cam.x + 7, by = y * TS - cam.y - 6 + Math.round(Math.sin(t * 4 + 1) * 1.5); ctx.fillStyle = '#140d0a'; ctx.fillRect(bx - 3, by - 1, 7, 7); if (tr.frag) drawMiniFrag(bx, by + 2, t); else drawMiniStar(bx, by + 2); }
+  for (const [k, tr] of city.trig) { if (!tr.mark || !tr.mark()) continue; const [x, y] = k.split(',').map(Number);
+    if (tr.coll) { if (Math.sin(t * 2.6 + x * 1.7) > .15) { const sx = x * TS - cam.x + 8, sy = y * TS - cam.y + 3, a = Math.sin(t * 2.6 + x * 1.7) > .7; ctx.fillStyle = '#bff7e3'; ctx.fillRect(sx, sy - (a ? 3 : 2), 1, a ? 7 : 5); ctx.fillRect(sx - (a ? 3 : 2), sy, a ? 7 : 5, 1); ctx.fillStyle = '#ffffff'; ctx.fillRect(sx, sy, 1, 1); } continue; } const bx = x * TS - cam.x + 7, by = y * TS - cam.y - 6 + Math.round(Math.sin(t * 4 + 1) * 1.5); ctx.fillStyle = '#140d0a'; ctx.fillRect(bx - 3, by - 1, 7, 7); if (tr.frag) drawMiniFrag(bx, by + 2, t); else drawMiniStar(bx, by + 2); }
   renderLight(t);
   renderParticles(t);
   updateHint();
@@ -1599,6 +1647,17 @@ const DOCS = {
     q: "Il est permis d'appeler ces terres un Nouveau Monde, car nos ancêtres n'en ont eu aucune connaissance. […] La plupart des Anciens affirment qu'au-delà de l'équateur, vers le sud, il n'y a pas de continent, seulement la mer. Mon dernier voyage a montré que cette opinion est fausse et tout à fait contraire à la vérité.",
     src: "Lettre attribuée à Amerigo Vespucci, <i>Mundus Novus</i>, imprimée en 1503 et rééditée partout en Europe. Traduction libre du latin.",
     note: "Un navigateur ose écrire que les Anciens se sont trompés, parce qu'il a vu de ses yeux. En 1507, un cartographe donnera à ces terres le nom d'« America »." },
+  odhecaton: { type: 'Partition', titre: 'Le premier livre de musique imprimé', date: '1501',
+    src: "Ottaviano Petrucci, <i>Harmonice Musices Odhecaton</i> (« Cent chansons de musique harmonieuse »), Venise, 1501. C'est le premier recueil de musique à plusieurs voix imprimé avec des caractères mobiles.",
+    note: "On y trouve des chansons de compositeurs franco-flamands, comme Josquin des Prez, les musiciens les plus admirés d'Europe. Grâce à l'imprimerie, une même chanson peut maintenant être chantée à Venise, à Florence et à Anvers, sans la recopier à la main." },
+  roteiro: { type: 'Texte', titre: 'Le journal du premier voyage de Vasco de Gama', date: 'mai 1498',
+    q: "Ils lui demandèrent ce qu'il était venu chercher si loin. Il répondit : « Nous venons chercher des chrétiens et des épices. »",
+    src: "<i>Roteiro</i> (journal de bord) du premier voyage de Vasco de Gama aux Indes, attribué au marin Álvaro Velho. Passage de l'arrivée à Calicut, en Inde, en mai 1498. Traduction libre du portugais.",
+    note: "Un marin note, jour après jour, ce qu'il voit : en contournant l'Afrique, la flotte débouche sur un océan Indien grand ouvert, puis atteint l'Inde. Ce journal ne sera imprimé qu'en 1838 : en 1520, ce sont des marins comme João qui répandent la nouvelle de vive voix." },
+  pline: { type: 'Texte', titre: "Pline l'Ancien, Histoire naturelle", date: 'vers 77',
+    q: "On dit que les Blemmyes n'ont pas de tête : leur bouche et leurs yeux sont fixés sur leur poitrine.",
+    src: "Pline l'Ancien, <i>Histoire naturelle</i>, livre V, vers 77. Imprimée à Venise dès 1469, elle est lue par tous les savants de la Renaissance. Traduction libre du latin.",
+    note: "Pline n'a jamais vu de Blemmyes : il répète ce que d'autres ont écrit avant lui (« on dit que… »). Pendant des siècles, livres et cartes reprennent ces « peuples monstrueux » parce qu'un Ancien en parle. La question du savant : qui l'a vu, et comment le sait-on?" },
   durer: { type: 'Texte', titre: "Dürer, Journal de voyage aux Pays-Bas", date: '27 août 1520',
     q: "Je n'ai rien vu de toute ma vie qui réjouisse autant mon cœur que ces choses. Car j'y ai vu des objets merveilleusement travaillés, et je me suis émerveillé de l'esprit subtil des hommes de ces pays lointains.",
     src: "Albrecht Dürer, journal de son voyage aux Pays-Bas (1520-1521), entrée écrite à Bruxelles. Traduction libre.",
@@ -1671,6 +1730,7 @@ const LK = {
   portier: { skin: SKINS[1], hair: HAIRS[4], top: '#e9e3d6', top2: '#1b1d2e', trim: '#1b1d2e', robe: true, hat: 'tonsure', pbg: '#4a4a5a' },
   enfantC: { skin: SKINS[0], hair: HAIRS[2], top: '#3c6a8a', top2: '#2a4a6a', trim: '#e9e1cf', bottom: '#4a3a2a', hat: 'cap', hatc: '#5a3a22', pbg: '#3c6a8a' },
   leonard: { skin: SKINS[0], hair: HAIRS[4], top: '#c86a7a', top2: '#9a4a5a', trim: '#e9e1cf', bottom: '#4a3a4a', long: true, hat: 'beret', hatc: '#3a2a3a', beard: '#9a958e', pbg: '#7a4a5a', book: '#e4cf9e' },
+  luthiste: { skin: SKINS[3], hair: HAIRS[0], top: '#b4412b', top2: '#7a2a18', trim: '#e2ae48', bottom: '#2e4a9a', hat: 'beret', hatc: '#2e4a9a', pbg: '#7a2a18', book: '#c98a3a' },
   paysanne: { skin: SKINS[2], hair: HAIRS[1], top: '#8a7a5a', top2: '#6a5a3a', trim: '#e9e1cf', robe: true, long: true, hat: 'scarf', hatc: '#a8412b', pbg: '#4a5a3a' }
 };
 function npc(o) { return Object.assign({ dir: 0, idle: true }, o); }
@@ -1694,6 +1754,14 @@ function buildFlorence() {
   C.block(2, 4, 9, 6); C.draw(2, g => drawPalazzo(g, 2, 4));
   C.fill('plat', 2, 10, 9, 1); C.block(2, 11, 9, 1); C.block(7, 11, 1, 1, 0);
   C.draw(3, g => drawRinghiera(g, 2, 10, 10, 7));
+  // balustrade du côté est : on ne monte sur la tribune que par les marches, devant le garde
+  C.block(11, 9, 1, 2);
+  C.draw(3, g => {
+    const x = 11 * TS, y0 = 9 * TS, h = 2 * TS + 12;
+    P(g, x + 12, y0 + 3, 4, h - 1, 'rgba(20,10,5,.25)');
+    P(g, x, y0, 12, h, '#b9a67f'); P(g, x, y0, 12, 2, '#dccba8'); P(g, x, y0, 2, h, '#dccba8'); P(g, x + 10, y0, 2, h, '#7d6a4c'); P(g, x, y0 + h - 2, 12, 2, '#7d6a4c');
+    for (let k = y0 + 4; k < y0 + h - 6; k += 7) P(g, x + 3, k, 6, 4, '#a6926b');
+  });
   C.sprite(6 * TS + 8, 11 * TS - 1, g => statueDavid(g, 6 * TS + 8, 11 * TS - 1), [6, 10]);
   // maisons de gauche
   C.block(0, 4, 2, 7); C.draw(1, g => house(g, 0, 4, 2, 7, { wall: '#e0c9a0', wallH: 60, shutter: '#5b7a4a' }));
@@ -1730,6 +1798,7 @@ function buildFlorence() {
         say(this, "Et devant l'atelier, jette un œil au **vieux marbre antique** que les apprentis dessinent toute la journée. Les savants adorent ces vieilles pierres!"),
         say(this, "Et si tu croises **messer Leonardo**, le peintre aux cheveux longs, près de la Loggia, demande-lui ce qu'il dessine dans ses carnets… si tu as l'estomac solide!"),
         say(this, "Les petites étoiles au-dessus des portes t'indiquent où aller. Les points au-dessus des têtes : des gens qui ont quelque chose à te dire."),
+        say(this, "Et ouvre l'œil : les savants collectionnent les trésors de l'Antiquité. Les **losanges verts** au-dessus des têtes et les **reflets** dans le décor en cachent dix, dans les trois villes de ton voyage. Range-les dans ton **cabinet d'antiques**, dans ton carnet!"),
         act(() => { S.flags.fl_bianca = 1; })
       ];
       const r = remaining('florence');
@@ -1762,7 +1831,7 @@ function buildFlorence() {
   const machiavel = npc({ id: 'machiavel', name: 'Nicolas Machiavel', role: 'secrétaire de la République', short: 'à Machiavel', real: true, x: 14, y: 10, dir: 0, look: LK.machiavel,
     mark: () => (!S.flags.fl_open && S.bg !== 'noble' && !S.flags.fl_pass) ? '!' : null,
     talk() {
-      const intro = [say(this, "Niccolò Machiavelli, secrétaire de la Seconde Chancellerie. J'écris des lettres pour la République du matin au soir.")];
+      const intro = [say(this, latinGreet() + "Niccolò Machiavelli, secrétaire de la Seconde Chancellerie. J'écris des lettres pour la République du matin au soir.")];
       if (S.bg === 'noble' && !S.flags.fl_mac) return [...intro, say(this, "Toi, ta famille a des amis au Conseil. Tu n'as pas besoin de moi pour monter sur la tribune."),
         say(this, "Un conseil gratuit : regarde les hommes tels qu'ils sont, pas tels qu'on voudrait qu'ils soient. J'en ferai peut-être un livre un jour."), act(() => S.flags.fl_mac = 1), narr("Machiavel écrira Le Prince en 1513.")];
       if (!S.flags.fl_pass && !S.flags.fl_open) return [...intro, say(this, "Tu veux voir le géant de près, et le garde t'en empêche? Les gardes aiment les papiers. Donnons-lui un papier."),
@@ -1798,16 +1867,30 @@ function buildFlorence() {
         { n: this, t: "Veux-tu voir mes carnets? Certaines pages ne sont pas pour les âmes sensibles.", choice: [{ t: 'Montre-moi tes carnets', fn: () => { Dialog.close(); Acts.anatomie(); return 'stop'; } }, { t: 'Plus tard', fn: () => 'stop' }] }];
     }
   });
-  C.npcs.push(bianca, taddeo, garde, machiavel, frere, garcon, vendeuse, dame, leonard);
+  const luth = npc({ id: 'luth', name: 'Baccio', role: 'joueur de luth', short: 'à Baccio', x: 16, y: 9, dir: 0, look: LK.luthiste,
+    mark: () => !S.docs.includes('odhecaton') ? '?' : null,
+    talk() {
+      if (S.docs.includes('odhecaton')) return [say(this, "Encore un air? Celui-là, je l'ai appris d'un chanteur venu de Flandre."), act(() => Snd.lute()), narr("Les notes du luth résonnent sous les arches de la Loggia.")];
+      return [say(this, "Approche, approche! Écoute ça."), act(() => Snd.lute()),
+        narr("Baccio pince les cordes de son luth. Un air léger s'élève sous les arches de la Loggia."),
+        say(this, "Le luth, c'est l'instrument de tout le monde à Florence : les marchands, les dames, les étudiants. On chante des **frottole**, des chansons d'amour à plusieurs voix."),
+        say(this, "Et tu sais quoi? À Venise, un certain **Petrucci** imprime maintenant la musique avec des caractères mobiles, comme les livres! Plus besoin de tout recopier à la main."), act(() => addDoc('odhecaton')),
+        say(this, "Les humanistes, eux, rêvent de retrouver la musique des Grecs. Le vieux **Marsile Ficin** chantait des hymnes antiques en s'accompagnant de sa lyre, comme Orphée. Même messer Leonardo joue de la lyre, on dit qu'il improvise à merveille!"),
+        say(this, "Un jour, peut-être, on racontera des histoires entières en chantant, comme dans les tragédies grecques…"),
+        narr("Baccio a vu juste : vers 1600, des humanistes de Florence inventeront l'**opéra** en voulant faire renaître le théâtre grec, qu'ils croyaient entièrement chanté.")];
+    }
+  });
+  C.npcs.push(bianca, taddeo, garde, machiavel, frere, garcon, vendeuse, dame, leonard, luth);
   // --- objets et portes ---
   const bott = { label: "Entrer dans l'atelier", fn: () => { if (S.ideas.individu) Dialog.run([narr("L'atelier sent l'huile de lin et la térébenthine. L'apprenti refait son carrelage… correctement, cette fois.")]); else Acts.perspective(); }, mark: () => !S.ideas.individu };
   C.trig.set('22,8', bott);
   C.on(7, 9, 'Porte du Palais', () => Dialog.run([narr("Les lourdes portes du Palais de la Seigneurie sont fermées. Le Grand Conseil siège.")]));
-  const dav = { label: 'Observer le David', fn: () => { if (S.ideas.optimisme) Dialog.run([narr("Le géant regarde au loin, calme et décidé. Un bloc que personne n'osait tailler, devenu le symbole de toute une ville.")]); else Acts.david(); }, mark: () => !S.ideas.optimisme && S.flags.fl_open };
+  const dav = { label: 'Observer le David', fn: () => { if (!S.flags.fl_open) { Dialog.run([say(garde, "Halte! Descends de là. La tribune est réservée aux magistrats et à leurs invités.")]); return; } if (S.ideas.optimisme) Dialog.run([narr("Le géant regarde au loin, calme et décidé. Un bloc que personne n'osait tailler, devenu le symbole de toute une ville.")]); else Acts.david(); }, mark: () => !S.ideas.optimisme && S.flags.fl_open };
   C.trig.set('6,10', dav);
   C.sprite(25 * TS + 8, 10 * TS - 1, g => marbleTorso(g, 25 * TS + 8, 10 * TS - 1), [25, 9]);
   C.trig.set('25,9', fragTrigger('florence', 'Le marbre antique', "Le vieux torse de marbre attend les apprentis. Tu sais maintenant ce que Michel-Ange a appris des Anciens."));
   C.on(12, 8, 'La Loggia', () => Dialog.run([narr("La Loggia de la Seigneurie : c'est ici que la République tient ses cérémonies publiques. Devant le Palais, le David vient de prendre la place de la Judith de Donatello, qu'on a déplacée.")]));
+  collHook(C);
   C.start = { x: 1, y: 13, dir: 2 };
   return C;
 }
@@ -1887,12 +1970,12 @@ function buildAnvers() {
   const joao = npc({ id: 'joao', name: 'João', role: 'marin portugais', short: 'à João', x: 11, y: 14, dir: 0, look: LK.joao,
     mark: () => !S.flags.an_joao ? '?' : null,
     talk() { return [say(this, "Moi, João, j'ai fait trois fois le voyage de Lisbonne jusqu'aux Indes, en passant sous l'Afrique, par la route ouverte par Vasco de Gama en 1498."),
-      say(this, "Les vieux livres disent que l'océan Indien est fermé, comme un grand lac. J'y ai navigué pendant des mois : il est grand ouvert, crois-moi! Et nous sommes des centaines à l'avoir vu."), act(() => { S.flags.an_joao = 1; })]; }
+      say(this, "Les vieux livres disent que l'océan Indien est fermé, comme un grand lac. J'y ai navigué pendant des mois : il est grand ouvert, crois-moi! Et nous sommes des centaines à l'avoir vu."), act(() => { S.flags.an_joao = 1; addDoc('roteiro'); })]; }
   });
   const diego = npc({ id: 'diego', name: 'Diego', role: 'marin', short: 'à Diego', x: 17, y: 13, dir: 1, look: LK.diego,
     mark: () => !S.flags.an_diego ? '?' : null,
     talk() { return [say(this, "Tu sais quoi? L'ami de mon cousin a vu, au-delà des mers, des hommes sans tête, avec les yeux et la bouche sur la poitrine!"),
-      me("Et toi, tu les as vus?"), say(this, "Moi? Non. Mais le vieux Pline en parle déjà dans ses livres, alors ça doit être vrai, non?"), act(() => { S.flags.an_diego = 1; })]; }
+      me("Et toi, tu les as vus?"), say(this, "Moi? Non. Mais le vieux Pline en parle déjà dans ses livres, alors ça doit être vrai, non?"), act(() => { S.flags.an_diego = 1; addDoc('pline'); })]; }
   });
   const marchand = npc({ id: 'marchand', name: 'Maître Lopes', role: 'marchand portugais', short: 'à Lopes', x: 23, y: 13, dir: 0, look: LK.marchand,
     mark: () => (S.flags.an_quest && !S.flags.an_paper && !S.flags.an_open) ? '!' : null,
@@ -1925,6 +2008,7 @@ function buildAnvers() {
   C.trig.set('8,10', fragTrigger('anvers', "L'étal du libraire", "Le libraire range ses livres. « Festina lente, l'ami! Hâte-toi lentement! »"));
   C.trig.set('20,4', { label: 'La tour de Notre-Dame', fn: () => Dialog.run([narr("La tour de Notre-Dame d'Anvers : commencée en 1422, elle sera achevée en 1521. Avec ses 123 mètres, elle domine tout le pays.")]) });
   C.trig.set('20,6', C.trig.get('20,4'));
+  collHook(C);
   C.start = { x: 1, y: 9, dir: 2 };
   return C;
 }
@@ -2005,7 +2089,7 @@ function buildCologne() {
   const erasme = npc({ id: 'erasme', name: 'Érasme de Rotterdam', role: 'humaniste', short: 'à Érasme', real: true, x: 5, y: 16, dir: 0, look: LK.erasme,
     mark: () => (!S.docs.includes('erasme2') || (S.bg !== 'religieux' && !S.flags.co_letter && !S.flags.co_open)) ? '!' : null,
     talk() {
-      const L = [say(this, "Désiré Érasme, de Rotterdam. Tout le monde me demande ce que je pense de Luther. Au prince électeur de Saxe, j'ai répondu ceci :"),
+      const L = [say(this, latinGreet() + "Désiré Érasme, de Rotterdam. Tout le monde me demande ce que je pense de Luther. Au prince électeur de Saxe, j'ai répondu ceci :"),
         say(this, "« Luther a commis deux fautes : il a touché à la couronne du pape et au ventre des moines. »"),
         say(this, "Je critique les abus de l'Église depuis longtemps. Dans mon **Éloge de la folie**, c'est la Folie elle-même qui parle et qui se moque des puissants. Le rire est une arme plus fine que le feu."),
         say(this, "Mais je reste dans l'Église. On la réforme de l'intérieur, avec des arguments. Pas en jetant tout au feu, d'un côté comme de l'autre."), act(() => { addDoc('erasme2'); addDoc('erasme'); })];
@@ -2040,6 +2124,7 @@ function buildCologne() {
   C.on(2, 15, "Porte de l'auberge", () => Dialog.run([narr("« Complet! » crie l'aubergiste. La cour de l'empereur a pris toutes les chambres de la ville.")]));
   const cath = { label: 'La cathédrale', fn: () => { addDoc('cathedrale'); Dialog.run([narr("La cathédrale de Cologne, commencée en 1248 pour abriter les reliques des Rois mages. Le chantier s'essouffle : seuls le chœur et le bas d'une tour sont terminés. Au sommet de la tour, la vieille grue attend.")]); } };
   [3, 4, 13].forEach(x => C.trig.set(x + ',8', cath));
+  collHook(C);
   C.start = { x: 25, y: 12, dir: 3 };
   return C;
 }
@@ -2396,7 +2481,7 @@ Acts.carte = function () {
   ];
   const step2 = () => {
     const sh = Panel.open(`${actHeader('anvers', 'sciences', 'Que faut-il dessiner?', 2, 3)}
-      <div class="grid2"><div style="position:sticky;top:0;z-index:1"><canvas id="map" class="mini" width="320" height="170"></canvas><p style="font-size:.8em;color:var(--ink2);margin-top:6px">La carte du maître Cornelis, d'après Ptolémée. Elle change selon tes décisions.</p></div>
+      <div class="grid2"><div class="mapdock"><canvas id="map" class="mini" width="320" height="170"></canvas><p>La carte du maître Cornelis, d'après Ptolémée. Elle change selon tes décisions.</p></div>
       <div id="claims"></div></div><div id="fb" aria-live="polite"></div>`);
     const mapc = sh.querySelector('#map'); drawWorldMap(mapc, state);
     const box = sh.querySelector('#claims');
@@ -2776,6 +2861,250 @@ Acts.fragment = function (cid) {
   makeQuestion(sh.querySelector('#qz'), F.q, () => finishFragment(cid));
 };
 /* =========================================================
+   IDENTITÉ D'HUMANISTE — nom latin, devise, emblème, apparence
+   ========================================================= */
+const HATS = [['famille', 'Celui de ta famille'], ['beret', 'Béret'], ['cap', 'Toque'], ['wide', 'Chapeau à larges bords'], ['hood', 'Capuchon'], ['coif', 'Coiffe'], ['scarf', 'Foulard'], ['none', 'Tête nue']];
+const MOTTOS = [
+  { k: 'sapere', la: 'Sapere aude', fr: 'Ose savoir', who: 'le poète latin Horace' },
+  { k: 'fontes', la: 'Ad fontes', fr: 'Retourne aux sources', who: 'le mot d\'ordre des humanistes' },
+  { k: 'festina', la: 'Festina lente', fr: 'Hâte-toi lentement', who: 'la devise de l\'imprimeur Alde Manuce, et avant lui de l\'empereur Auguste' },
+  { k: 'concedo', la: 'Concedo nulli', fr: 'Je ne cède à personne', who: 'la devise d\'Érasme' },
+  { k: 'nosce', la: 'Nosce te ipsum', fr: 'Connais-toi toi-même', who: 'l\'inscription du temple de Delphes, traduite en latin' },
+  { k: 'ultra', la: 'Plus ultra', fr: 'Plus loin encore', who: 'la devise de Charles Quint, couronné empereur en 1520' },
+  { k: 'humani', la: 'Humani nihil a me alienum', fr: 'Rien de ce qui est humain ne m\'est étranger', who: 'd\'après le poète latin Térence' },
+  { k: 'spero', la: 'Dum spiro, spero', fr: 'Tant que je respire, j\'espère', who: 'une vieille maxime latine' }
+];
+const MOTTO = Object.fromEntries(MOTTOS.map(m => [m.k, m]));
+const EMBLEMS = {
+  ancre: { label: 'L\'ancre', sens: 'la patience et la persévérance', px: ['....#....', '...#.#...', '....#....', '..#####..', '....#....', '....#....', '#...#...#', '.#..#..#.', '..#####..'] },
+  chouette: { label: 'La chouette', sens: 'la sagesse (l\'oiseau de Minerve)', px: ['.#.....#.', '.#######.', '##.###.##', '#.#.#.#.#', '##.###.##', '.#######.', '.##.#.##.', '..#####..', '..#...#..'] },
+  livre: { label: 'Le livre ouvert', sens: 'le savoir et la lecture', px: ['##.....##', '#.##.##.#', '#...#...#', '#.#.#.#.#', '#...#...#', '#.#.#.#.#', '#...#...#', '###.#.###', '...###...'] },
+  compas: { label: 'Le compas', sens: 'la mesure et la raison', px: ['....#....', '...###...', '....#....', '...#.#...', '...#.#...', '..#...#..', '..#...#..', '.#.....#.', '.#.....#.'] },
+  flambeau: { label: 'Le flambeau', sens: 'la lumière qui chasse l\'ignorance', px: ['....#....', '...###...', '..##.##..', '..#####..', '...###...', '..#####..', '....#....', '....#....', '....#....'] },
+  sphere: { label: 'La sphère', sens: 'la curiosité pour le monde', px: ['...###...', '.##.#.##.', '.#..#..#.', '#########', '#...#...#', '#########', '.#..#..#.', '.##.#.##.', '...###...'] }
+};
+function drawEmblem(g, key, cx, cy, s, color) {
+  const E = EMBLEMS[key]; if (!E) return; g.fillStyle = color;
+  E.px.forEach((row, r) => [...row].forEach((ch, c) => { if (ch === '#') g.fillRect(Math.round(cx + (c - 4.5) * s), Math.round(cy + (r - 4.5) * s), Math.ceil(s), Math.ceil(s)); }));
+}
+// nom latin : les humanistes latinisaient leur nom (Desiderius Erasmus, Copernicus…)
+const LATIN_NAMES = {
+  jean: 'Joannes', yan: 'Joannes', yann: 'Joannes', john: 'Joannes', pierre: 'Petrus', jacques: 'Jacobus', marie: 'Maria', catherine: 'Catharina', caterina: 'Catharina', katherine: 'Catharina', guillaume: 'Guilielmus',
+  william: 'Guilielmus', liam: 'Guilielmus', louis: 'Ludovicus', charles: 'Carolus', francois: 'Franciscus', francoise: 'Francisca', antoine: 'Antonius', nicolas: 'Nicolaus',
+  mathieu: 'Matthaeus', matthew: 'Matthaeus', mathis: 'Matthias', philippe: 'Philippus', etienne: 'Stephanus', laurent: 'Laurentius', olivier: 'Oliverius', alexandre: 'Alexander',
+  alexandra: 'Alexandra', gabriel: 'Gabriel', samuel: 'Samuel', noah: 'Noe', noe: 'Noe', leo: 'Leo', felix: 'Felix', victor: 'Victor', emile: 'Aemilius', emilie: 'Aemilia',
+  emily: 'Aemilia', jules: 'Julius', julien: 'Julianus', juliette: 'Julia', charlotte: 'Carola', alice: 'Alicia', rose: 'Rosa', florence: 'Florentia', claire: 'Clara',
+  luc: 'Lucas', arthur: 'Arthurus', anne: 'Anna', elisabeth: 'Elisabetha', isabelle: 'Isabella', madeleine: 'Magdalena', marguerite: 'Margarita', benjamin: 'Beniaminus',
+  michel: 'Michael', raphael: 'Raphael', nathan: 'Nathanael', adam: 'Adamus', simon: 'Simon', paul: 'Paulus', henri: 'Henricus', edouard: 'Eduardus', edward: 'Eduardus',
+  maxime: 'Maximus', vincent: 'Vincentius', xavier: 'Xaverius', jerome: 'Hieronymus', thomas: 'Thomas', david: 'David', daniel: 'Daniel', james: 'Jacobus', zachary: 'Zacharias',
+  jacob: 'Jacobus', chloe: 'Chloe', zoe: 'Zoe', lea: 'Lea', mia: 'Mia', emma: 'Emma', eva: 'Eva', eve: 'Eva',
+  sarah: 'Sara', sara: 'Sara', laura: 'Laura', lily: 'Lilia', jade: 'Jada', ines: 'Agnes', agnes: 'Agnes', beatrice: 'Beatrix', gabrielle: 'Gabriella', camille: 'Camilla',
+  dominique: 'Dominicus', frederic: 'Fridericus', georges: 'Georgius', gregoire: 'Gregorius', hugo: 'Hugo', martin: 'Martinus',
+  adrien: 'Hadrianus', adrian: 'Hadrianus', sebastien: 'Sebastianus', tristan: 'Tristanus', eloise: 'Heloisa', helene: 'Helena', sophie: 'Sophia'
+};
+function latinWord(w, first) {
+  const base = w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+  if (!base) return w;
+  let r;
+  if (first && LATIN_NAMES[base]) r = LATIN_NAMES[base];
+  else if (/(us|um|a|o|x)$/.test(base)) r = base;
+  else if (/ie$/.test(base)) r = base.slice(0, -2) + 'ia';
+  else if (/(ine|elle|ette|anne|enne)$/.test(base)) r = base.slice(0, -1) + 'a';
+  else if (/e$/.test(base)) r = base.slice(0, -1) + (first ? 'a' : 'us');
+  else if (/y$/.test(base)) r = base.slice(0, -1) + 'ius';
+  else if (/i$/.test(base)) r = base + 'us';
+  else r = base + 'us';
+  return r.charAt(0).toUpperCase() + r.slice(1);
+}
+function latinize(name) {
+  let first = true;
+  return (name || '').trim().split(/(\s+|-)/).map(p => { if (!p || p === '-') return p; if (/^\s+$/.test(p)) { first = false; return p; } return latinWord(p, first); }).join('');
+}
+function emblemCanvas(key, px = 9) { return `<canvas class="emb" data-emb="${key}" width="${px * 4}" height="${px * 4}" aria-hidden="true"></canvas>`; }
+function paintEmblems(root, color = '#1f2b63') { root.querySelectorAll('canvas[data-emb]').forEach(c => { const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); drawEmblem(g, c.dataset.emb, c.width / 2, c.height / 2, c.width / 9, color); }); }
+// éditeur réutilisé à la création du personnage et dans le carnet
+function identityEditor(host, opts) {
+  const st = { latin: S.latin || latinize(S.name), useLatin: S.latinChosen ? !!S.latin : true, motto: S.motto || null, emblem: S.emblem || null };
+  const draw = () => {
+    host.innerHTML = `
+      <div class="field"><label for="latIn">Ton nom d'humaniste <span style="font-weight:400;opacity:.75">(les humanistes latinisaient leur nom : Érasme signait <i>Desiderius Erasmus</i>)</span></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="text" id="latIn" maxlength="28" autocomplete="off" value="${esc(st.latin)}" style="max-width:260px" ${st.useLatin ? '' : 'disabled'}>
+        <div class="seg" id="latUse"><button type="button" data-u="1" aria-pressed="${st.useLatin}">Utiliser mon nom latin</button><button type="button" data-u="0" aria-pressed="${!st.useLatin}">Garder « ${esc(S.name)} »</button></div></div>
+        <div id="latMsg" class="nommsg" aria-live="polite"></div></div>
+      <div class="field"><span class="lab">Ta devise</span><div class="mottos" id="mottos">${MOTTOS.map(m => `<button type="button" class="motto" data-m="${m.k}" aria-pressed="${st.motto === m.k}"><b>${m.la}</b><span>${m.fr}</span><em>${m.who}</em></button>`).join('')}</div></div>
+      <div class="field"><span class="lab">Ton emblème</span><div class="emblems" id="embs">${Object.entries(EMBLEMS).map(([k, E]) => `<button type="button" class="emblem" data-e="${k}" aria-pressed="${st.emblem === k}" title="${E.label} : ${E.sens}">${emblemCanvas(k)}<span>${E.label}</span></button>`).join('')}</div>
+        <p id="embSens" style="font-size:.85em;margin:.4em 0 0;color:var(--ink2)">${st.emblem ? `${EMBLEMS[st.emblem].label} représente ${EMBLEMS[st.emblem].sens}.` : 'Choisis un symbole : il figurera sur le sceau de ton certificat.'}</p></div>
+      <div class="btnrow"><button class="btn gold" type="button" id="idOk">${opts.cta}</button><button class="btn" type="button" id="idRnd">Au hasard</button>${opts.back ? `<button class="btn ghost" type="button" id="idBack">${opts.backLabel || 'Retour'}</button>` : ''}</div>`;
+    paintEmblems(host);
+    const li = host.querySelector('#latIn');
+    li.oninput = () => { const v = Censor.clean(li.value); if (v !== li.value) li.value = v; st.latin = v; const bad = Censor.isBad(v); li.classList.toggle('bad', bad); host.querySelector('#latMsg').textContent = bad ? "Ce nom n'est pas digne d'un humaniste." : ''; };
+    host.querySelectorAll('[data-u]').forEach(b => b.onclick = () => { st.useLatin = b.dataset.u === '1'; Snd.sel(); draw(); });
+    host.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { st.motto = b.dataset.m; Snd.blip(); draw(); });
+    host.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { st.emblem = b.dataset.e; Snd.blip(); draw(); });
+    host.querySelector('#idRnd').onclick = () => { st.motto = MOTTOS[Math.floor(Math.random() * MOTTOS.length)].k; const ks = Object.keys(EMBLEMS); st.emblem = ks[Math.floor(Math.random() * ks.length)]; Snd.sel(); draw(); };
+    if (opts.back) host.querySelector('#idBack').onclick = () => { commit(true); opts.back(); };
+    host.querySelector('#idOk').onclick = () => { if (!commit()) return; opts.done(); };
+  };
+  const commit = (soft) => {
+    const v = (st.latin || '').trim();
+    if (st.useLatin && v && Censor.isBad(v)) { if (soft) return false; Snd.bad(); host.querySelector('#latIn').focus(); return false; }
+    S.latin = st.useLatin ? (v || latinize(S.name)) : ''; S.latinChosen = true;
+    S.motto = st.motto; S.emblem = st.emblem; save(); return true;
+  };
+  draw();
+}
+// nom affiché par les savants qui t'appellent par ton nom latin
+function latinGreet() { return S.latin ? `Salve, ${S.latin}! ` : ''; }
+/* =========================================================
+   CABINET D'ANTIQUES — 10 pièces à collectionner (bonus)
+   Les humanistes collectionnaient manuscrits, inscriptions et monuments anciens.
+   Pièces données par des personnages (giver) ou cachées dans le décor (tile).
+   ========================================================= */
+LK.pelerine = { skin: SKINS[1], hair: HAIRS[2], top: '#6a5a3a', top2: '#4a3e28', trim: '#e9e1cf', robe: true, long: true, hat: 'wide', hatc: '#4a3526', pbg: '#6a5a3a' };
+const COLL = [
+  /* ---------- FLORENCE, 1504 ---------- */
+  { id: 'ciceron', city: 'florence', giver: 'garcon', kind: 'Texte', titre: "Cicéron, De l'orateur", date: '55 av. J.-C.',
+    lines: n => [say(n, "Mon parrain est notaire. Il dit qu'un bon notaire doit écrire le latin comme Cicéron, alors il me fait recopier ses phrases tous les soirs!"),
+      say(n, "Tiens, prends cette page, j'en ai fait dix copies. Celle-là parle d'histoire.")],
+    intro: "Piero te tend une feuille couverte d'une écriture appliquée, avec quelques taches d'encre.",
+    q: "L'histoire est le témoin des temps, la lumière de la vérité, la vie de la mémoire, la maîtresse de vie, la messagère du passé.",
+    src: "Cicéron, <i>De l'orateur</i>, livre II, 55 av. J.-C. Traduction libre du latin.",
+    note: "Pour les humanistes, Cicéron est LE modèle : il écrit le plus beau latin de l'Antiquité et il a servi sa république. À Florence, on apprend le latin en recopiant ses phrases. Et toi, à quoi sert l'histoire?" },
+  { id: 'platon', city: 'florence', giver: 'dame', kind: 'Livre', titre: 'Platon, traduit par Marsile Ficin', date: 'imprimé vers 1484',
+    lines: n => [say(n, "Mon mari a acheté ce gros Platon pour impressionner ses clients. Il ne l'a jamais ouvert!"),
+      say(n, "Prends-le, toi. Au moins, quelqu'un le lira.")],
+    intro: "Un énorme volume relié de cuir rouge. Sur la première page : <i>Platonis Opera</i>, « les œuvres de Platon », traduites du grec au latin.",
+    src: "Platon, <i>Œuvres</i>, traduites du grec au latin par Marsile Ficin, imprimées à Florence vers 1484. La traduction avait été commandée par Cosme de Médicis.",
+    note: "Pendant des siècles, presque personne en Europe de l'Ouest ne pouvait lire Platon : on ne savait plus le grec. Grâce à Ficin, les savants découvrent un philosophe qui place l'âme et la dignité de l'être humain au centre. Pic de la Mirandole fréquentait ce cercle de lettrés." },
+  { id: 'lucrece', city: 'florence', tile: '18,13', label: "Fouiller l'étal", kind: 'Livre', titre: 'Lucrèce, De la nature', date: 'vers 50 av. J.-C.',
+    done: "Le brocanteur range sa marchandise. « Un autre livre de païen? Il ne m'en reste plus! »",
+    intro: "Sous une pile de livres de prières, sur l'étal du brocanteur, un petit volume usé. « Un livre de païen, ça! Prends-le pour trois sous », grogne le marchand.",
+    q: "Rien ne peut naître de rien, pas même par la volonté des dieux.",
+    src: "Lucrèce, <i>De la nature</i>, livre I, vers 50 av. J.-C. Un manuscrit oublié est retrouvé en 1417 dans un monastère allemand par le Florentin Poggio Bracciolini; le texte est imprimé dès 1473. Traduction libre du latin.",
+    note: "Lucrèce explique le monde par de minuscules particules, les atomes, plutôt que par la volonté des dieux. L'Église s'en méfie, mais les humanistes le lisent et le recopient. Chercher des causes naturelles, c'est déjà raisonner en savant." },
+  { id: 'vitruve', city: 'florence', tile: '15,8', label: 'Regarder sur le banc', kind: 'Livre', titre: "Vitruve, De l'architecture", date: 'vers 25 av. J.-C.',
+    done: "Le banc de la Loggia est vide. L'architecte a dû repartir mesurer quelque chose.",
+    intro: "Sur un banc de la Loggia, un architecte a oublié son livre, ouvert sur une page couverte de cercles et de carrés.",
+    q: "Si un homme se couche sur le dos, bras et jambes écartés, et qu'on place la pointe d'un compas sur son nombril, le cercle touchera le bout de ses doigts et de ses pieds.",
+    src: "Vitruve, <i>De l'architecture</i>, livre III, vers 25 av. J.-C. C'est le seul traité d'architecture de l'Antiquité qui nous soit parvenu; il est imprimé à Rome vers 1486. Traduction libre du latin.",
+    note: "Vers 1490, Léonard de Vinci dessine cet homme dans un cercle et un carré : c'est l'<b>Homme de Vitruve</b>. Le corps humain devient la mesure de toute chose, jusque dans l'architecture des églises et des palais." },
+  /* ---------- ANVERS, 1520 ---------- */
+  { id: 'cesar', city: 'anvers', giver: 'poiss', kind: 'Texte', titre: 'Jules César, La guerre des Gaules', date: 'vers 50 av. J.-C.',
+    lines: n => [say(n, "Mon fils va à l'école latine. Hier, il est rentré tout fier : Jules César lui-même dit que nous, les Belges, sommes les plus braves!"),
+      say(n, "Tiens, regarde sa copie. Moi, je n'y comprends rien, mais ça a l'air savant.")],
+    intro: "Une feuille un peu froissée, qui sent le hareng. Le fils d'Anneke a recopié la première page d'un livre très célèbre.",
+    q: "De tous ces peuples, les plus braves sont les Belges.",
+    src: "Jules César, <i>Commentaires sur la guerre des Gaules</i>, livre I, vers 50 av. J.-C. Traduction libre du latin.",
+    note: "Les humanistes des Pays-Bas adorent cette phrase. Mais qui parle? Le général romain qui a conquis la Gaule, et qui raconte ses propres victoires.",
+    quiz: { id: 'q_coll_cesar', prompt: "Qui a écrit cette phrase, et pourquoi faut-il s'en méfier un peu?",
+      opts: [
+        { t: "Un Belge de l'époque, qui exagère la bravoure de son peuple.", fb: "Non : l'auteur est le général romain qui a conquis la Gaule." },
+        { t: "Jules César, le conquérant : s'il dit que ses ennemis sont braves, sa victoire paraît encore plus glorieuse.", ok: true, fb: "Exactement. Avant de croire un document, on se demande qui l'a écrit et pourquoi. César écrit aussi pour sa propre gloire, à Rome." },
+        { t: "Un moine du Moyen Âge, qui a tout inventé.", fb: "Le texte date bien de l'Antiquité. Les moines l'ont recopié pendant des siècles, ils ne l'ont pas inventé." }] } },
+  { id: 'brabo', city: 'anvers', giver: 'enfantA', kind: 'Légende', titre: 'La légende de Brabo', date: 'racontée au Moyen Âge',
+    lines: n => [say(n, "Tu connais l'histoire du géant Antigoon? Il coupait la main des bateliers qui refusaient de payer pour passer sur l'Escaut!"),
+      say(n, "Alors un soldat romain, Brabo, lui a coupé la main à lui et l'a lancée dans le fleuve. Lancer la main, en flamand : **hand werpen**. Antwerpen! C'est pour ça que la ville s'appelle comme ça!")],
+    intro: "Mieke raconte l'histoire avec de grands gestes, comme si elle avait vu la scène.",
+    src: "Légende racontée dans les chroniques du Brabant à la fin du Moyen Âge. Les historiens pensent plutôt que le nom <i>Antwerpen</i> vient d'un mot désignant une butte de terre au bord du fleuve.",
+    note: "Beaucoup de villes de la Renaissance s'inventent un fondateur romain : ça donne du prestige. Mais aucun texte romain ni aucune inscription ne parle de Brabo.",
+    quiz: { id: 'q_coll_brabo', prompt: "Un humaniste entend la légende de Brabo. Que fait-il?",
+      opts: [
+        { t: "Il y croit : c'est une très vieille histoire, donc elle doit être vraie.", fb: "C'est l'erreur de Diego avec Pline! L'âge d'une histoire ne prouve rien." },
+        { t: "Il cherche des sources : un texte romain, une inscription, une pierre qui parlerait de Brabo.", ok: true, fb: "Et il n'en trouve aucune. La légende flatte la ville, mais l'histoire a besoin de preuves." },
+        { t: "Il la fait interdire, parce que les légendes sont dangereuses.", fb: "Pas besoin d'interdire : il suffit de distinguer la légende de l'histoire. Les légendes en disent long sur ceux qui les racontent." }] } },
+  { id: 'novum', city: 'anvers', tile: '19,13', label: 'Examiner la caisse', kind: 'Livre', titre: 'Érasme, le Nouveau Testament en grec', date: '1516',
+    done: "La caisse de livres attend toujours le navire pour Londres.",
+    intro: "Une caisse de livres attend d'être chargée sur un navire pour Londres. Sur le couvercle, on a écrit : « Bâle, Froben ». Un exemplaire dépasse.",
+    q: "Je voudrais que les plus humbles femmes lisent l'Évangile, que le laboureur en chante des passages en poussant sa charrue.",
+    src: "Érasme, <i>Novum Instrumentum</i>, imprimé à Bâle chez Froben en 1516 : le texte grec du Nouveau Testament, avec une nouvelle traduction latine. Citation tirée de sa préface. Traduction libre du latin.",
+    note: "<i>Ad fontes</i> : retourner aux sources! Plutôt que de se fier aux traductions recopiées pendant mille ans, Érasme compare les plus vieux manuscrits grecs. Luther traduira le Nouveau Testament en allemand à partir de son texte." },
+  /* ---------- COLOGNE, 1520 ---------- */
+  { id: 'tour', city: 'cologne', tile: '1,10', label: 'Observer la tour', kind: 'Monument', titre: 'La tour romaine', date: 'vers 50 apr. J.-C.',
+    done: "La vieille tour romaine, couverte de neige, monte la garde depuis quinze siècles.",
+    intro: "Au coin de la vieille muraille se dresse une tour ronde, plus ancienne que tout le reste. Ses pierres de couleur forment des cercles, des losanges et de petits frontons de temple.",
+    src: "Tour d'angle de l'enceinte romaine de la <i>Colonia</i>, construite vers 50 apr. J.-C. Elle est encore debout aujourd'hui, à Cologne.",
+    note: "Les Romains construisaient pour durer… et pour être beaux. Quinze siècles plus tard, les habitants vivent encore à l'intérieur des murs de la ville romaine. Un humaniste observe ces ruines comme un livre de pierre." },
+  { id: 'clematius', city: 'cologne', giver: 'pelerine', kind: 'Inscription', titre: "L'inscription de Clematius", date: 'IVe ou Ve siècle',
+    lines: n => [say(n, "Je reviens de l'église Sainte-Ursule! Des reliques par centaines… On dit qu'onze mille vierges y sont mortes pour leur foi."),
+      say(n, "Le sacristain m'a vendu la copie d'une très vieille pierre gravée. Moi, je ne lis pas le latin. Toi, peut-être?")],
+    intro: "Margarete te tend une copie soigneuse d'une inscription latine, avec les lignes et les abréviations de la pierre.",
+    src: "Pierre gravée en latin, conservée dans l'église Sainte-Ursule de Cologne, IVe ou Ve siècle. Elle dit qu'un certain Clematius a rebâti une église à l'endroit où des vierges chrétiennes sont mortes en martyres.",
+    note: "La pierre ne donne ni nom ni nombre. Des siècles plus tard, la légende parle d'Ursule et de 11 000 vierges. D'où vient ce chiffre? On ne le sait pas avec certitude. Une hypothèse : une abréviation mal lue sur une autre inscription.",
+    quiz: { id: 'q_coll_clematius', prompt: "La pierre ne dit pas combien de vierges sont mortes. Comment un humaniste juge-t-il le chiffre de 11 000?",
+      opts: [
+        { t: "Il le croit : toute la ville de Cologne raconte cette histoire.", fb: "Le nombre de personnes qui répètent une histoire ne la rend pas vraie." },
+        { t: "Il remonte à la source la plus ancienne, la pierre, et remarque qu'elle ne donne aucun chiffre.", ok: true, fb: "C'est la méthode : remonter à la source la plus ancienne. Ici, le chiffre de 11 000 apparaît bien plus tard que la pierre." },
+        { t: "Il demande au sacristain, qui connaît l'église mieux que personne.", fb: "Le sacristain répète la tradition, et il vend des copies aux pèlerins! Mieux vaut lire la source elle-même." }] } },
+  { id: 'tacite', city: 'cologne', giver: 'konrad', kind: 'Livre', titre: 'Tacite, La Germanie', date: '98 apr. J.-C.',
+    lines: n => [say(n, "Et tu connais la **Germanie** de Tacite? Les Italiens nous traitent de barbares. Mais Tacite, un Romain, décrivait nos ancêtres comme un peuple brave et pur!"),
+      say(n, "Tiens, j'en ai recopié un passage. Garde-le, j'en ai un autre.")],
+    intro: "Konrad te tend une page recopiée à la hâte, les doigts tachés d'encre et rougis par le froid.",
+    q: "Les Germains, je crois, sont un peuple né sur place, sans mélange avec d'autres peuples.",
+    src: "Tacite, <i>La Germanie</i>, chapitre 2, 98 apr. J.-C. Un seul manuscrit a survécu; retrouvé en Allemagne au XVe siècle, il est imprimé vers 1470. Traduction libre du latin.",
+    note: "Tacite est un sénateur romain qui n'est peut-être jamais allé en Germanie. Pourtant, vers 1500, les humanistes allemands brandissent son texte : nous aussi, nous avons une Antiquité glorieuse! Des siècles plus tard, des nationalistes en feront un usage dangereux. Peut-on être fier de ses ancêtres sans mépriser les autres?",
+    quiz: { id: 'q_coll_tacite', prompt: "Pourquoi les humanistes allemands aiment-ils tant ce petit livre en 1520?",
+      opts: [
+        { t: "Parce qu'un auteur ancien y décrit leurs ancêtres : ils peuvent être fiers face aux Italiens qui les traitent de barbares.", ok: true, fb: "Exactement. L'Antiquité sert aussi à se donner une identité. Mais Tacite décrit les Germains de loin, et parfois pour critiquer les Romains de son temps." },
+        { t: "Parce que Tacite était Allemand.", fb: "Non : Tacite était un sénateur romain." },
+        { t: "Parce que le pape avait interdit ce livre.", fb: "Rien de tel. Le manuscrit avait même été apporté à Rome, où on le lisait." }] } }
+];
+const COLLI = Object.fromEntries(COLL.map(c => [c.id, c]));
+const CITYLAB = { florence: 'Florence, 1504', anvers: 'Anvers, 1520', cologne: 'Cologne, 1520' };
+function nColl() { return COLL.filter(c => S.coll && S.coll[c.id]).length; }
+function collCard(c) {
+  return `<div class="doc coll"><div class="dtype">${esc(c.kind)} · ${esc(c.date)}</div><div style="font-family:var(--pix);font-weight:600;color:var(--lapis);margin-top:2px">◆ ${esc(c.titre)}</div>
+  ${c.q ? `<blockquote>« ${esc(c.q)} »</blockquote>` : ''}
+  <div class="src"><b>Source :</b> ${c.src}</div>
+  <p style="font-size:.86em;margin:.5em 0 0">${c.note}</p></div>`;
+}
+const Coll = {
+  open(id) {
+    const c = COLLI[id]; if (!c || (S.coll || {})[id]) return;
+    const sh = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">${CITYLAB[c.city]} · Cabinet d'antiques · pièce ${nColl() + 1} sur ${COLL.length}</div><h2>${esc(c.titre)}</h2>
+      <p>${c.intro}</p>${collCard(c)}<div id="qz"></div>`);
+    const qz = sh.querySelector('#qz');
+    if (c.quiz) makeQuestion(qz, Object.assign({ cta: 'Ranger dans le cabinet ◆' }, c.quiz), () => Coll.add(id));
+    else { qz.innerHTML = `<div class="btnrow"><button class="btn gold" type="button" id="cAdd">Ranger dans le cabinet ◆</button></div>`; qz.querySelector('#cAdd').onclick = () => Coll.add(id); }
+  },
+  add(id) {
+    Panel.onClose = null; Panel.close();
+    S.coll = S.coll || {}; S.coll[id] = 1; save(); Snd.ok();
+    const n = nColl();
+    toast(`Cabinet d'antiques : ${n} pièce${n > 1 ? 's' : ''} sur ${COLL.length}`);
+    if (n === COLL.length) Dialog.run([narr("Ton cabinet d'antiques est complet! Les dix pièces sont rangées dans ton carnet. Une mention spéciale t'attend sur ton certificat d'humaniste.")]);
+  }
+};
+// après la dernière réplique, ouvre la fiche de la pièce
+function collAfter(id) { return act(() => { const prev = Dialog.done; Dialog.done = () => { if (prev) prev(); if (!(S.coll || {})[id] && S.scene === 'city') Coll.open(id); }; }); }
+// branche les pièces d'une ville : déclencheurs dans le décor, répliques ajoutées aux personnages
+function collHook(C) {
+  if (C.id === 'cologne') { C.block(0, 9, 2, 2); C.sprite(1, 11 * TS - 1, g => romanTower(g, 1, 11 * TS - 1)); }
+  if (C.id === 'cologne') C.npcs.push(npc({ id: 'pelerine', name: 'Margarete', role: 'pèlerine', short: 'à Margarete', x: 20, y: 12, dir: 0, look: LK.pelerine,
+    talk() { return (S.coll || {}).clematius ? [say(this, "Je repars demain pour Aix-la-Chapelle. Encore des reliques à voir! Que Dieu te garde.")] : []; } }));
+  for (const c of COLL) {
+    if (c.city !== C.id) continue;
+    if (c.tile) C.trig.set(c.tile, { coll: c.id, label: c.label, fn: () => { if ((S.coll || {})[c.id]) Dialog.run([narr(c.done)]); else Coll.open(c.id); }, mark: () => !(S.coll || {})[c.id] });
+    if (c.giver) {
+      const n = C.npcs.find(x => x.id === c.giver); if (!n) continue;
+      const t0 = n.talk, m0 = n.mark;
+      n.talk = function () { const r = t0.call(this) || []; return (S.coll || {})[c.id] ? r : [...r, ...c.lines(this), collAfter(c.id)]; };
+      n.mark = () => (m0 && m0()) || (!(S.coll || {})[c.id] ? 'c' : null);
+    }
+  }
+}
+// tour romaine de Cologne (motifs de pierres de couleur, comme la vraie)
+function romanTower(g, x, yb) {
+  const w = 30, h = 46, y0 = yb - h;
+  P(g, x + 2, yb - 2, w, 4, 'rgba(10,10,30,.3)');
+  P(g, x, y0, w, h, '#a8987c'); P(g, x, y0, 2, h, '#8a7a62'); P(g, x + 2, y0, 5, h, '#bcac8e'); P(g, x + w - 9, y0, 4, h, '#988870'); P(g, x + w - 5, y0, 5, h, '#7a6a55');
+  for (let y = y0 + 4; y < yb; y += 5) P(g, x, y, w, 1, 'rgba(60,45,30,.25)');
+  for (let i = 0; i < 4; i++) { const cx = x + 4 + i * 6; P(g, cx + 1, y0 + 8, 2, 4, '#7a3a2a'); P(g, cx, y0 + 9, 4, 2, '#7a3a2a'); P(g, cx + 1, y0 + 9, 2, 2, '#e8e0cc'); }
+  for (let i = 0; i < 4; i++) { const cx = x + 4 + i * 6; P(g, cx, y0 + 18, 4, 4, '#e8e0cc'); P(g, cx + 1, y0 + 19, 2, 2, '#5a4a3a'); }
+  for (let i = 0; i < 2; i++) { const cx = x + 6 + i * 12; P(g, cx + 2, y0 + 27, 2, 1, '#7a3a2a'); P(g, cx + 1, y0 + 28, 4, 1, '#7a3a2a'); P(g, cx, y0 + 29, 6, 1, '#7a3a2a'); P(g, cx, y0 + 30, 1, 6, '#e8e0cc'); P(g, cx + 5, y0 + 30, 1, 6, '#e8e0cc'); }
+  P(g, x + 2, y0 - 3, 6, 3, '#a8987c'); P(g, x + 12, y0 - 2, 7, 2, '#a8987c'); P(g, x + 22, y0 - 4, 6, 4, '#a8987c');
+  P(g, x, y0 - 1, w, 2, '#eef2f8'); P(g, x + 2, y0 - 4, 6, 1, '#eef2f8'); P(g, x + 22, y0 - 5, 6, 1, '#eef2f8');
+}
+/* =========================================================
    JEU — scènes, écrans, carnet, menu, voyages, épilogue
    ========================================================= */
 const Game = {
@@ -2866,11 +3195,16 @@ const Game = {
             ${Object.keys(BGS).map(k => `<button type="button" class="bgcard" data-bg="${k}" aria-pressed="${S.bg === k}"><b>${BGS[k].label}</b><span>${BGTXT[k].d}</span><span class="adv">${BGTXT[k].a}</span></button>`).join('')}
           </div></div>
           <div class="field"><span class="lab">Ta tenue</span><div class="seg" id="outfit"><button type="button" data-o="pourpoint" aria-pressed="${S.look.outfit === 'pourpoint'}">Pourpoint et chausses</button><button type="button" data-o="robe" aria-pressed="${S.look.outfit === 'robe'}">Robe longue</button></div></div>
+          <div class="field"><span class="lab">Ton chapeau</span><div class="seg" id="hat">${HATS.map(([k, l]) => `<button type="button" data-h="${k}" aria-pressed="${(S.look.hat || 'famille') === k}">${l}</button>`).join('')}</div></div>
+          <div class="grid2" style="gap:10px">
+            <div class="field"><span class="lab">Coiffure</span><div class="seg" id="hlen"><button type="button" data-l="court">Cheveux courts</button><button type="button" data-l="long">Cheveux longs</button></div></div>
+            <div class="field"><span class="lab">Barbe</span><div class="seg" id="beard"><button type="button" data-b="0">Sans barbe</button><button type="button" data-b="1">Avec barbe</button></div></div>
+          </div>
           <div class="grid2" style="gap:10px">
             <div class="field"><span class="lab">Cheveux</span><div class="swatches" id="hair">${HAIRS.map((c, i) => `<button type="button" class="sw" style="background:${c}" data-i="${i}" aria-label="Cheveux ${i + 1}" aria-pressed="${S.look.hair === i}"></button>`).join('')}</div></div>
             <div class="field"><span class="lab">Teint</span><div class="swatches" id="skin">${SKINS.map((c, i) => `<button type="button" class="sw" style="background:${c}" data-i="${i}" aria-label="Teint ${i + 1}" aria-pressed="${S.look.skin === i}"></button>`).join('')}</div></div>
           </div>
-          <div class="btnrow"><button class="btn gold" type="button" id="go">Partir pour Florence</button><button class="btn ghost" type="button" id="back">Retour</button></div>
+          <div class="btnrow"><button class="btn gold" type="button" id="go">Continuer</button><button class="btn" type="button" id="rnd">Apparence au hasard</button><button class="btn ghost" type="button" id="back">Retour</button></div>
         </div>
       </div></div>`;
     const pv = $('#pv'); let pdir = 0, pt = 0;
@@ -2880,12 +3214,21 @@ const Game = {
       sc.querySelectorAll('[data-o]').forEach(b => b.setAttribute('aria-pressed', b.dataset.o === S.look.outfit));
       sc.querySelectorAll('#hair .sw').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.look.hair));
       sc.querySelectorAll('#skin .sw').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === S.look.skin));
+      sc.querySelectorAll('[data-h]').forEach(b => b.setAttribute('aria-pressed', b.dataset.h === (S.look.hat || 'famille')));
+      const famHat = HATS.find(h => h[0] === BGS[S.bg].hat); const fb = sc.querySelector('[data-h="famille"]'); if (fb) fb.textContent = 'Celui de ta famille' + (famHat ? ` (${famHat[1].toLowerCase()})` : '');
+      const longNow = S.look.hairLen ? S.look.hairLen === 'long' : S.look.outfit === 'robe';
+      sc.querySelectorAll('[data-l]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.l === 'long') === longNow));
+      sc.querySelectorAll('[data-b]').forEach(b => b.setAttribute('aria-pressed', (b.dataset.b === '1') === !!S.look.beard));
     };
     Game._pv = () => { if (S.scene !== 'create' || !document.body.contains(pv)) return; pt++; if (pt % 90 === 0) pdir = (pdir + 1) % 4; const g = pv.getContext('2d'); g.clearRect(0, 0, 18, 22); g.drawImage(getSprite(playerLook(), [0, 2, 3, 1][pdir], Math.floor(pt / 9) % 4), 0, 0); };
     sc.querySelectorAll('[data-bg]').forEach(b => b.onclick = () => { S.bg = b.dataset.bg; Snd.sel(); upd(); });
     sc.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.look.outfit = b.dataset.o; Snd.sel(); upd(); });
     sc.querySelectorAll('#hair .sw').forEach(b => b.onclick = () => { S.look.hair = +b.dataset.i; Snd.blip(); upd(); });
     sc.querySelectorAll('#skin .sw').forEach(b => b.onclick = () => { S.look.skin = +b.dataset.i; Snd.blip(); upd(); });
+    sc.querySelectorAll('[data-h]').forEach(b => b.onclick = () => { S.look.hat = b.dataset.h; Snd.sel(); upd(); });
+    sc.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { S.look.hairLen = b.dataset.l; Snd.sel(); upd(); });
+    sc.querySelectorAll('[data-b]').forEach(b => b.onclick = () => { S.look.beard = b.dataset.b === '1'; Snd.sel(); upd(); });
+    $('#rnd').onclick = () => { const R = a => a[Math.floor(Math.random() * a.length)]; S.look.outfit = R(['pourpoint', 'robe']); S.look.hat = R(HATS)[0]; S.look.hair = Math.floor(Math.random() * HAIRS.length); S.look.hairLen = R(['court', 'long']); S.look.beard = Math.random() < .3; Snd.sel(); upd(); };
     $('#nom').oninput = () => { const el = $('#nom'), v = Censor.clean(el.value); if (v !== el.value) el.value = v; const bad = Censor.isBad(v); el.classList.toggle('bad', bad); $('#nomMsg').textContent = bad ? "Ce nom n'est pas digne d'un humaniste. Choisis-en un autre." : ''; upd(); }; $('#nom').onkeydown = e => { if (e.key === 'Enter') $('#go').click(); };
     $('#back').onclick = () => Game.title();
     const codeIn = $('#code');
@@ -2896,9 +3239,18 @@ const Game = {
       if (Censor.isBad(v)) { Snd.bad(); $('#nom').classList.add('bad'); $('#nomMsg').textContent = "Ce nom n'est pas digne d'un humaniste. Choisis-en un autre, par exemple " + names[Math.floor(Math.random() * names.length)] + '.'; $('#nom').focus(); return; }
       S.name = v || names[Math.floor(Math.random() * names.length)];
       if (betaCode(codeIn.value)) S.beta = true;
-      Snd.ok(); Game.intro();
+      Snd.ok(); Game.identity();
     };
     upd(); setTimeout(() => $('#nom').focus(), 60);
+  },
+
+  /* ---------- Identité d'humaniste (2e étape de la création) ---------- */
+  identity() {
+    S.scene = 'create';
+    const sc = $('#screen'); sc.hidden = false;
+    sc.innerHTML = `<div class="sheet create" role="dialog" aria-label="Ton identité d'humaniste"><div class="eyebrow">Europe, 1504 · étape 2 sur 2</div><h2>Ton identité d'humaniste</h2>
+      <p style="margin-top:0">Les humanistes se donnaient un nom latin, une devise et un emblème. On les retrouvait sur leurs livres, leurs lettres et leurs sceaux. Les tiens figureront sur ton certificat.</p><div id="idz"></div></div>`;
+    identityEditor($('#idz'), { cta: 'Partir pour Florence', done: () => { Snd.ok(); Game.intro(); }, back: () => Game.create(), backLabel: 'Retour à l\'apparence' });
   },
 
   /* ---------- Introduction ---------- */
@@ -2985,38 +3337,55 @@ const Game = {
   },
 
   /* ---------- Carnet ---------- */
-  carnet(tab = 'etoiles') {
+  carnet(tab = 'etoiles', back = null) {
     if (S.scene !== 'city' && S.scene !== 'end') return;
-    const tabs = [['etoiles', 'Étoiles'], ['docs', 'Documents'], ['perso', 'Mon humaniste'], ['gens', 'Personnages']];
+    const tabs = [['etoiles', 'Étoiles'], ['docs', 'Documents'], ['cabinet', "Cabinet d'antiques"], ['perso', 'Mon humaniste'], ['gens', 'Personnages']];
     const sh = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">Carnet de voyage</div><h2>Le carnet de ${esc(S.name)}</h2>
-      <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" type="button" data-t="${k}" aria-selected="${k === tab}">${l}</button>`).join('')}</div><div id="cz"></div>`);
-    sh.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { Game.carnet(b.dataset.t); });
+      <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" role="tab" type="button" data-t="${k}" aria-selected="${k === tab}">${l}</button>`).join('')}</div><div id="cz"></div>`, back);
+    // changer d'onglet rouvre le panneau : on garde le chemin du retour (ex. l'écran de fin)
+    sh.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { Game.carnet(b.dataset.t, back); });
     const cz = sh.querySelector('#cz');
     if (tab === 'etoiles') {
       const row = I => { const on = S.ideas[I.id]; return `<div class="idea ${on ? '' : 'locked'} ${I.bonus ? 'bonus' : ''}"><canvas data-s="${I.id}"></canvas><div><div class="dis">${DISC[I.disc].label} · ${I.bonus ? I.where : { florence: 'Florence', anvers: 'Anvers', cologne: 'Cologne' }[I.city]}</div><div class="in">${on ? `${I.name} <span class="sub">(${I.sub})</span>` : '???'}</div><div style="font-size:.9em">${on ? I.def : I.bonus ? I.hint() : 'Pas encore découverte.'}</div></div></div>`; };
       cz.innerHTML = `<p>${nReq()} idée(s) humaniste(s) sur 6.</p>` + IDEAS.map(row).join('') + `<h3>Étoiles bonus</h3>` + BONUSES.map(row).join('');
       cz.querySelectorAll('[data-s]').forEach(c => drawStar(c, !!S.ideas[c.dataset.s], 13, DISC[IDEA[c.dataset.s].disc].color));
     } else if (tab === 'docs') {
-      const all = Object.keys(DOCS);
-      cz.innerHTML = `<p>${S.docs.length} document(s) sur ${all.length}. Parle aux gens et explore pour en trouver d'autres.</p>` + (S.docs.length ? S.docs.map(d => docHTML(d)).join('') : '<p><i>Aucun document pour l\'instant.</i></p>');
+      const reach = docsReachable();
+      const others = Object.entries(FAMILY_DOC).filter(([bg]) => bg !== S.bg);
+      cz.innerHTML = `<p>${S.docs.length} document(s) sur ${reach.length}. ${S.docs.length < reach.length ? "Parle aux gens et explore pour en trouver d'autres." : 'Tu les as tous trouvés!'}</p>` + (S.docs.length ? S.docs.map(d => docHTML(d)).join('') : '<p><i>Aucun document pour l\'instant.</i></p>')
+        + `<h3>Réservés à d'autres familles</h3><p style="font-size:.9em;margin-top:0">Ces documents existent, mais ta famille ne t'ouvre pas ces portes. Rejoue avec une autre famille pour les découvrir.</p>`
+        + others.map(([bg, id]) => `<div class="doc" style="opacity:.6"><div class="dtype">Accès réservé · ${esc(BGS[bg].label)}</div><div style="font-family:var(--pix);font-weight:600;color:var(--lapis);margin-top:2px">???</div></div>`).join('');
+    } else if (tab === 'cabinet') {
+      const n = nColl();
+      cz.innerHTML = `<p>Les humanistes collectionnent les traces de l'Antiquité : manuscrits, inscriptions, monuments. Dix pièces t'attendent dans les trois villes. Cherche les <b style="color:#2f8a66">losanges verts</b> au-dessus des têtes et les <b style="color:#2f8a66">reflets</b> dans le décor.</p>
+        <p><b>${n} pièce${n > 1 ? 's' : ''} sur ${COLL.length}</b>${n === COLL.length ? ' · cabinet complet! ◆' : ''}</p>`
+        + COLL.map(c => (S.coll || {})[c.id] ? collCard(c) : `<div class="doc" style="opacity:.6"><div class="dtype">${esc(c.kind)} · ${CITYLAB[c.city]}</div><div style="font-family:var(--pix);font-weight:600;color:var(--lapis);margin-top:2px">◇ ???</div></div>`).join('');
     } else if (tab === 'perso') {
       const first = firstTryCount(), q = MAIN_Q.filter(k => S.tries[k]).length;
       cz.innerHTML = `<div class="grid2"><div class="preview" style="min-height:200px"><canvas id="cp" width="18" height="22"></canvas><div class="pname">${esc(S.name)}</div><div class="pbg">${BGS[S.bg].label}</div></div>
-      <div><p><b>Parcours :</b> Florence (1504, 20 ans) → Anvers (1520, 36 ans) → Cologne (1520).</p>
+      <div>${S.latin ? `<p><b>Nom d'humaniste :</b> <i>${esc(S.latin)}</i></p>` : ''}
+      ${MOTTO[S.motto] ? `<p><b>Devise :</b> <i>« ${MOTTO[S.motto].la} »</i> : ${MOTTO[S.motto].fr} <span style="font-size:.85em;color:var(--ink2)">(${MOTTO[S.motto].who})</span></p>` : ''}
+      ${EMBLEMS[S.emblem] ? `<p style="display:flex;align-items:center;gap:8px"><b style="white-space:nowrap">Emblème :</b> ${emblemCanvas(S.emblem)} ${EMBLEMS[S.emblem].label}, ${EMBLEMS[S.emblem].sens}</p>` : ''}
+      <div class="btnrow" style="margin:.2em 0 .8em"><button class="btn" type="button" id="idEdit">${S.motto || S.emblem ? 'Changer ma devise ou mon emblème' : 'Choisir ma devise et mon emblème'}</button></div>
+      <p><b>Parcours :</b> Florence (1504, 20 ans) → Anvers (1520, 36 ans) → Cologne (1520).</p>
       <p><b>Questions réussies du premier coup :</b> ${first} sur ${q || 0} répondue(s).</p>
+      <p><b>Cabinet d'antiques :</b> ${nColl()} pièce(s) sur ${COLL.length}${nColl() === COLL.length ? ' · Collectionneur d\'antiques ◆' : ''}.</p>
       <p><b>Fragments de l'Antiquité :</b> ${nFrags()} sur 3${S.ideas.antiquite ? ' · étoile bonus allumée ★' : ''}.</p>
       ${S.flags.portrait ? `<p><b>Portrait :</b> dessiné au fusain par Albrecht Dürer, à Anvers, en septembre 1520.</p>` : ''}
       ${S.beta ? '<p><span class="tag" style="background:#1f2b63">Bêta-testeur officiel</span> Tu fais partie des premiers à jouer à ce jeu, avant tout le monde.</p>' : ''}
       <p><b>Ton avantage :</b> ${{ noble: 'ta famille noble t\'a ouvert la tribune de la Seigneurie, à Florence.', religieux: 'ta famille religieuse t\'a ouvert la bibliothèque du couvent, à Cologne.', bourgeois: 'ta famille bourgeoise t\'a ouvert l\'atelier de l\'imprimeur, à Anvers.' }[S.bg]}</p></div></div>`;
       const cp = $('#cp'), g = cp.getContext('2d'); g.drawImage(getSprite(playerLook(), 0, 0), 0, 0);
+      paintEmblems(cz);
+      cz.querySelector('#idEdit').onclick = () => { const s2 = Panel.open(`<button class="close" data-close type="button">Fermer ✕</button><div class="eyebrow">Carnet de voyage</div><h2>Ton identité d'humaniste</h2><p style="margin-top:0">Maintenant que tu connais mieux les idées humanistes, quelle devise te ressemble?</p><div id="idz"></div>`, back);
+        identityEditor(s2.querySelector('#idz'), { cta: 'Enregistrer', done: () => { Snd.ok(); toast('Identité enregistrée'); Game.carnet('perso', back); } }); };
       if (S.flags.portrait) { cp.style.filter = 'grayscale(1) sepia(.5) contrast(1.2)'; }
     } else {
       const R = [['Nicolas Machiavel', 'Florence', true, "Secrétaire de la République de Florence de 1498 à 1512, auteur du Prince (1513)."], ['Albrecht Dürer', 'Anvers et Cologne', true, "Peintre et graveur de Nuremberg. Il voyage bien aux Pays-Bas en 1520-1521 et passe à Cologne en novembre 1520."], ['Érasme de Rotterdam', 'Cologne', true, "Le plus célèbre humaniste d'Europe. Il est bien à Cologne en novembre 1520."], ['Léonard de Vinci', 'Florence', true, "Peintre, ingénieur et anatomiste. Il est bien à Florence en 1504, où il travaille à la bataille d'Anghiari commandée pour le Palais de la Seigneurie."]];
-      const F = [['Bianca, Taddeo, Piero, Nanna, Ginevra, frère Lorenzo, messer Agnolo', 'Florence'], ['Griet, Cornelis, Jan, maître Joris, João, Diego, Lopes, Mieke, Anneke', 'Anvers'], ['Hans, Konrad, Gertrud, frère Ortwin, frère Johann, frère Matthias, Lotte', 'Cologne']];
+      const F = [['Bianca, Taddeo, Piero, Nanna, Ginevra, Baccio, frère Lorenzo, messer Agnolo', 'Florence'], ['Griet, Cornelis, Jan, maître Joris, João, Diego, Lopes, Mieke, Anneke', 'Anvers'], ['Hans, Konrad, Gertrud, frère Ortwin, frère Johann, frère Matthias, Lotte, Margarete', 'Cologne']];
       cz.innerHTML = `<p>Ce jeu mélange des personnages réels et des personnages inventés, qui représentent les gens de l'époque. Les événements (le David, le bûcher des livres de Luther, le couronnement de Charles Quint) sont réels.</p>
       <h3>Personnages réels</h3>${R.map(r => `<p><span class="tag real">réel</span> <b>${r[0]}</b> (${r[1]}) : ${r[3]}</p>`).join('')}
       <h3>Personnages inventés</h3>${F.map(f => `<p><span class="tag fict">inventé</span> ${f[0]} (${f[1]})</p>`).join('')}
-      <p style="font-size:.85em;color:var(--ink2)">Également mentionnés (réels) : Léonard de Vinci, Michel-Ange, Alberti, Savonarole, Lisa del Giocondo, Vasco de Gama, Amerigo Vespucci, Ptolémée, Luther, le nonce Aléandre, Léon X, Charles Quint, Pic de la Mirandole, Thomas More, Agostino di Duccio, Antonio Rossellino, Laurent de Médicis, Giorgio Vasari, Alde Manuce, l'empereur Auguste, l'empereur Claude, Agrippine, Konrad Peutinger, Galien, Mondino de Liuzzi, Ascanio Condivi, Antonio de Beatis, André Vésale.</p>`;
+      <p style="font-size:.85em;color:var(--ink2)">Également mentionnés (réels) : Léonard de Vinci, Michel-Ange, Alberti, Savonarole, Lisa del Giocondo, Vasco de Gama, Amerigo Vespucci, Ptolémée, Luther, le nonce Aléandre, Léon X, Charles Quint, Pic de la Mirandole, Thomas More, Agostino di Duccio, Antonio Rossellino, Laurent de Médicis, Giorgio Vasari, Alde Manuce, l'empereur Auguste, l'empereur Claude, Agrippine, Konrad Peutinger, Galien, Mondino de Liuzzi, Ascanio Condivi, Antonio de Beatis, André Vésale, Marsile Ficin, Ottaviano Petrucci, Josquin des Prez.</p>`;
     }
   },
 
@@ -3078,7 +3447,7 @@ const Game = {
     const n = nReq(), first = firstTryCount();
     const sh = Panel.open(`<div class="eyebrow">Fin du voyage</div><h2>Le ciel de ${esc(S.name)}</h2>
       <div class="grid2"><div class="preview" style="min-height:180px"><canvas id="ep" width="18" height="22"></canvas><div class="pname">${esc(S.name)}</div><div class="pbg">${BGS[S.bg].label} · Florence, Anvers, Cologne</div></div>
-      <div><p><b>${n} idée(s) humaniste(s) sur 6</b> · ${first} question(s) réussie(s) du premier coup · ${S.docs.length} document(s) historique(s) dans ton carnet.</p>
+      <div><p><b>${n} idée(s) humaniste(s) sur 6</b> · ${first} question(s) réussie(s) du premier coup · ${S.docs.length} document(s) historique(s) dans ton carnet · ${nColl()} pièce(s) sur ${COLL.length} dans ton cabinet d'antiques${nColl() === COLL.length ? ' ◆' : ''}.</p>
       ${IDEAS.map(I => `<p style="margin:.2em 0">${S.ideas[I.id] ? '★' : '☆'} <b>${I.name}</b> <span class="tag">${DISC[I.disc].label}</span></p>`).join('')}
       ${BONUSES.map(I => `<p style="margin:.2em 0">${S.ideas[I.id] ? '★' : '☆'} <b>${I.name}</b> <span class="tag" style="background:#8a5a12">Bonus</span></p>`).join('')}
       ${S.beta ? '<p style="margin:.6em 0 0"><span class="tag" style="background:#1f2b63">Bêta-testeur officiel · 2026</span> Merci d\'avoir testé le jeu en primeur! Les erreurs que tu signales aideront les élèves des autres écoles.</p>' : ''}</div></div>
@@ -3089,7 +3458,7 @@ const Game = {
       <div class="btnrow"><button class="btn gold" type="button" id="eC">Ouvrir le carnet</button><button class="btn" type="button" id="eR">Rejouer avec une autre famille</button><button class="btn ghost" type="button" id="eT">Écran titre</button></div>`, () => { if (S.scene === 'end') Game.title(); });
     const g = $('#ep').getContext('2d'); g.drawImage(getSprite(playerLook(), 0, 0), 0, 0);
     if (n === 6) certificatePanel($('#certZone')); else $('#certZone').innerHTML = `<div class="fb info">Allume les six étoiles pour obtenir ton certificat d'humaniste.</div>`;
-    $('#eC').onclick = () => { Panel.onClose = null; Game.carnet(); Panel.onClose = () => Game.end(); };
+    $('#eC').onclick = () => { Panel.onClose = null; Game.carnet('etoiles', () => Game.end()); };
     $('#eR').onclick = () => { Panel.onClose = null; Panel.close(); clearSave(); const m = S.mode; S = freshState(); S.mode = m; for (const k in cities) delete cities[k]; Game.create(); };
     $('#eT').onclick = () => { Panel.onClose = null; Panel.close(); Game.title(); };
   }

@@ -36,6 +36,16 @@
   .play:hover{background:var(--gold2)}
   .play:focus-visible{outline:3px solid var(--gold2);outline-offset:3px}
   .soon{border-style:dashed;opacity:.75}
+  .card{position:relative}
+  .card.maj{box-shadow:0 0 0 3px #c0392b,0 8px 0 3px #000}
+  .majbadge{position:absolute;top:22px;right:-50px;transform:rotate(38deg);background:#c0392b;color:#fff;font-family:var(--pix);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;padding:4px 52px;box-shadow:0 2px 0 #6e1518;z-index:2;white-space:nowrap}
+  .tag.maj{background:#c0392b;animation:clignote 1.6s ease-in-out infinite}
+  @keyframes clignote{50%{background:#e2574a}}
+  @media (prefers-reduced-motion:reduce){.tag.maj{animation:none}}
+  .nouveau{background:#fbe9e5;border:2px solid #c0392b;border-radius:3px;padding:8px 12px;font-size:14.5px}
+  .nouveau b{color:#a1262a;font-family:var(--pix);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+  .nouveau ul{margin:.3em 0 0;padding-left:1.1em}
+  .nouveau li{margin:.1em 0}
   footer{margin-top:40px;text-align:center;font-size:14px;color:var(--parch2)}
   footer b{font-family:var(--pix);color:var(--gold2);font-weight:500}
 </style>
@@ -66,10 +76,20 @@ const JEUX = [
     dossier: "ciel-des-humanistes/",
     niveau: "Secondaire 2",
     chapitre: "Chapitre 1 · Renaissance et humanisme",
-    duree: "Environ 25 minutes",
+    duree: "Environ 25 à 35 minutes",
     resume: "Crée ton humaniste et voyage à Florence, à Anvers et à Cologne. Allume les six étoiles des idées humanistes, et deux étoiles bonus si tu es curieux.",
     beta: true,
-    ciel: true
+    ciel: true,
+    maj: {
+      date: "13 octobre 2026",
+      nouveautes: [
+        "Un cabinet d'antiques : 10 trésors de l'Antiquité à collectionner",
+        "Ton nom latin, ta devise et ton emblème sur le certificat",
+        "Plus de choix d'apparence : chapeau, coiffure, barbe",
+        "Un joueur de luth à Florence et 3 nouveaux documents",
+        "Les bogues signalés par la classe sont corrigés. Merci!"
+      ]
+    }
   },
   {
     titre: "Six vies (1840-1896)",
@@ -86,12 +106,13 @@ const JEUX = [
 
 const grille = document.getElementById('jeux');
 JEUX.forEach((j, k) => {
-  const a = document.createElement('article'); a.className = 'card';
-  a.innerHTML = `<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
+  const a = document.createElement('article'); a.className = 'card' + (j.maj ? ' maj' : '');
+  a.innerHTML = `${j.maj ? '<div class="majbadge" aria-hidden="true">Mis à jour</div>' : ''}<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
     <div class="body">
-      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}</div>
+      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}${j.maj ? `<span class="tag maj">Mise à jour · ${j.maj.date}</span>` : ''}</div>
       <h2>${j.titre}</h2>
       <p>${j.resume}</p>
+      ${j.maj ? `<div class="nouveau"><b>Quoi de neuf?</b><ul>${j.maj.nouveautes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
       <div class="meta">${j.chapitre} · ${j.duree}</div>
       <a class="play" href="${j.dossier}">${j.verrou ? 'Entrer le mot de passe ▶' : 'Jouer ▶'}</a>
     </div>`;
