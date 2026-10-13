@@ -28,6 +28,7 @@
   .tags{display:flex;flex-wrap:wrap;gap:6px}
   .tag{font-family:var(--pix);font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--lapis);color:var(--parch);padding:2px 7px;border-radius:2px}
   .tag.beta{background:#b4412b}
+  .tag.lock{background:var(--ink)}
   .card h2{font-family:var(--pix);font-weight:700;color:var(--lapis);font-size:22px;margin:0;line-height:1.1}
   .card p{margin:0;font-size:15.5px}
   .meta{font-size:13.5px;color:var(--ink2);font-style:italic}
@@ -69,6 +70,16 @@ const JEUX = [
     resume: "Crée ton humaniste et voyage à Florence, à Anvers et à Cologne. Allume les six étoiles des idées humanistes, et deux étoiles bonus si tu es curieux.",
     beta: true,
     ciel: true
+  },
+  {
+    titre: "Six vies (1840-1896)",
+    dossier: "six-vies/",
+    niveau: "Secondaire 4",
+    chapitre: "Chapitre 1 · La formation du régime fédéral canadien",
+    duree: "Environ 15 minutes par vie",
+    resume: "Six personnes, six trajectoires, un même demi-siècle. À chaque carte, un choix, puis ce qui s'est vraiment passé. Réservé aux élèves de 4e secondaire.",
+    beta: true,
+    verrou: true
   }
   // , { titre: "Prochain jeu", dossier: "prochain-jeu/", niveau: "Secondaire 4", chapitre: "…", duree: "…", resume: "…" }
 ];
@@ -78,15 +89,36 @@ JEUX.forEach((j, k) => {
   const a = document.createElement('article'); a.className = 'card';
   a.innerHTML = `<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
     <div class="body">
-      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}</div>
+      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}</div>
       <h2>${j.titre}</h2>
       <p>${j.resume}</p>
       <div class="meta">${j.chapitre} · ${j.duree}</div>
-      <a class="play" href="${j.dossier}">Jouer ▶</a>
+      <a class="play" href="${j.dossier}">${j.verrou ? 'Entrer le mot de passe ▶' : 'Jouer ▶'}</a>
     </div>`;
   grille.appendChild(a);
-  dessinerCiel(a.querySelector('canvas'), k + 1);
+  if (j.verrou) dessinerCadenas(a.querySelector('canvas'), k + 1);
+  else dessinerCiel(a.querySelector('canvas'), k + 1);
 });
+// cadenas en pixel art sur papier de registre, pour les jeux protégés
+function dessinerCadenas(c, graine) {
+  const g = c.getContext('2d');
+  g.fillStyle = '#e2e9eb'; g.fillRect(0, 0, 160, 60);
+  g.fillStyle = '#c9d5d9'; for (let y = 7; y < 60; y += 8) g.fillRect(0, y, 160, 1);
+  g.fillStyle = '#d7a3a0'; g.fillRect(22, 0, 1, 60);
+  // anse
+  g.fillStyle = '#5a6670';
+  for (let a = 0; a <= 180; a += 2) { const r = a * Math.PI / 180; g.fillRect(80 + Math.cos(r) * 11 | 0, 24 - Math.sin(r) * 12 | 0, 3, 3); }
+  g.fillRect(69, 24, 3, 6); g.fillRect(89, 24, 3, 6);
+  // corps
+  g.fillStyle = '#a1262a'; g.fillRect(64, 29, 33, 24);
+  g.fillStyle = '#c6453f'; g.fillRect(64, 29, 33, 3);
+  g.fillStyle = '#6e1518'; g.fillRect(64, 51, 33, 2);
+  // serrure
+  g.fillStyle = '#fbfaf6'; g.fillRect(78, 36, 5, 5); g.fillRect(79, 41, 3, 6);
+  // tampon « 1840 – 1896 »
+  g.fillStyle = '#a1262a'; g.font = 'bold 9px Georgia, serif'; g.save(); g.translate(122, 20); g.rotate(-.18);
+  g.fillText('1840', -10, 0); g.fillText('1896', -10, 11); g.strokeStyle = '#a1262a'; g.strokeRect(-14, -10, 30, 25); g.restore();
+}
 // petit ciel étoilé en pixel art pour l'illustration de chaque carte
 function dessinerCiel(c, graine) {
   const g = c.getContext('2d'); let s = graine * 9301;
