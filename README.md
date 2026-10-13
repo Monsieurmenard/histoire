@@ -8,6 +8,13 @@ Site : https://monsieurmenard.github.io/histoire/
 
 - `index.html` : page d'accueil qui liste les jeux
 - `ciel-des-humanistes/` : Le Ciel des humanistes (sec. 2, chapitre 1, Renaissance et humanisme)
+- `six-vies/` : Six vies, 1840-1896 (sec. 4, chapitre 1), **version bêta protégée par mot de passe**. Volontairement absent de la page d'accueil : le lien direct est https://monsieurmenard.github.io/histoire/six-vies/
+
+## Jeux protégés par mot de passe
+
+Le fichier `six-vies/index.html` est **chiffré** : il ne contient que du texte illisible tant qu'on n'entre pas le mot de passe.
+
+⚠️ Pour corriger Six vies, **ne remplace jamais** ce fichier par la version normale du jeu : elle deviendrait lisible par tout le monde, et l'historique de GitHub la garderait même après suppression. Demande plutôt à Claude de rechiffrer la nouvelle version.
 
 ## Ajouter un jeu
 
