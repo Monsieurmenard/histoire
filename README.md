@@ -10,6 +10,8 @@ Site : https://monsieurmenard.github.io/histoire/
 - `ciel-des-humanistes/` : Le Ciel des humanistes (sec. 2, chapitre 1, Renaissance et humanisme)
 - `six-vies/` : Six vies, 1840-1896 (sec. 4, chapitre 1), **version bêta protégée par mot de passe** (carte « Accès réservé » sur la page d'accueil). Lien direct : https://monsieurmenard.github.io/histoire/six-vies/
 
+- *La Carte repeinte : le scribe de Tlatelolco* (sec. 2, chapitre 2, colonialisme européen) : **teaser seulement** sur la page d'accueil (carte « Bientôt · novembre 2026 », sans lien). Le jeu n'est pas encore dans le dépôt.
+
 ## Jeux protégés par mot de passe
 
 Le fichier `six-vies/index.html` est **chiffré** : il ne contient que du texte illisible tant qu'on n'entre pas le mot de passe.

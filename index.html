@@ -46,6 +46,12 @@
   .nouveau b{color:#a1262a;font-family:var(--pix);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
   .nouveau ul{margin:.3em 0 0;padding-left:1.1em}
   .nouveau li{margin:.1em 0}
+  .card h2 small{display:block;font-family:var(--serif);font-style:italic;font-weight:400;font-size:15px;color:#b23f2a;margin-top:3px}
+  .card.teaser{background:#efe2c0;box-shadow:0 0 0 3px #b23f2a,0 8px 0 3px #000}
+  .card.teaser .art{background:#d7dccb}
+  .tag.codex{background:#b23f2a}
+  .majbadge.bientot{background:#1d1813;color:#efe2c0;box-shadow:0 2px 0 #b23f2a}
+  .play.off{background:#e4d1a3;color:#5a4632;box-shadow:none;border-style:dashed;cursor:default}
   footer{margin-top:40px;text-align:center;font-size:14px;color:var(--parch2)}
   footer b{font-family:var(--pix);color:var(--gold2);font-weight:500}
 </style>
@@ -100,24 +106,34 @@ const JEUX = [
     resume: "Six personnes, six trajectoires, un même demi-siècle. À chaque carte, un choix, puis ce qui s'est vraiment passé. Réservé aux élèves de 4e secondaire.",
     beta: true,
     verrou: true
+  },
+  {
+    titre: "La Carte repeinte",
+    sousTitre: "le scribe de Tlatelolco",
+    niveau: "Secondaire 2",
+    chapitre: "Chapitre 2 · Le colonialisme européen",
+    duree: "Environ 30 minutes",
+    resume: "Tlatelolco, 1576. Les Castillans ont dessiné tes terres comme si elles étaient vides. Écoute les aînés, lis les vrais documents, et rends à la carte ce qui y était.",
+    bientot: "Novembre 2026"
   }
   // , { titre: "Prochain jeu", dossier: "prochain-jeu/", niveau: "Secondaire 4", chapitre: "…", duree: "…", resume: "…" }
 ];
 
 const grille = document.getElementById('jeux');
 JEUX.forEach((j, k) => {
-  const a = document.createElement('article'); a.className = 'card' + (j.maj ? ' maj' : '');
-  a.innerHTML = `${j.maj ? '<div class="majbadge" aria-hidden="true">Mis à jour</div>' : ''}<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
+  const a = document.createElement('article'); a.className = 'card' + (j.maj ? ' maj' : '') + (j.bientot ? ' teaser' : '');
+  a.innerHTML = `${j.maj ? '<div class="majbadge" aria-hidden="true">Mis à jour</div>' : ''}${j.bientot ? '<div class="majbadge bientot" aria-hidden="true">Bientôt</div>' : ''}<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
     <div class="body">
-      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}${j.maj ? `<span class="tag maj">Mise à jour · ${j.maj.date}</span>` : ''}</div>
-      <h2>${j.titre}</h2>
+      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}${j.maj ? `<span class="tag maj">Mise à jour · ${j.maj.date}</span>` : ''}${j.bientot ? `<span class="tag codex">Bientôt · ${j.bientot}</span>` : ''}</div>
+      <h2>${j.titre}${j.sousTitre ? `<small>${j.sousTitre}</small>` : ''}</h2>
       <p>${j.resume}</p>
       ${j.maj ? `<div class="nouveau"><b>Quoi de neuf?</b><ul>${j.maj.nouveautes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
       <div class="meta">${j.chapitre} · ${j.duree}</div>
-      <a class="play" href="${j.dossier}">${j.verrou ? 'Entrer le mot de passe ▶' : 'Jouer ▶'}</a>
+      ${j.bientot ? `<span class="play off">Arrive en ${j.bientot.toLowerCase()}</span>` : `<a class="play" href="${j.dossier}">${j.verrou ? 'Entrer le mot de passe ▶' : 'Jouer ▶'}</a>`}
     </div>`;
   grille.appendChild(a);
-  if (j.verrou) dessinerCadenas(a.querySelector('canvas'), k + 1);
+  if (j.bientot) dessinerCarte(a.querySelector('canvas'));
+  else if (j.verrou) dessinerCadenas(a.querySelector('canvas'), k + 1);
   else dessinerCiel(a.querySelector('canvas'), k + 1);
 });
 // cadenas en pixel art sur papier de registre, pour les jeux protégés
@@ -139,6 +155,31 @@ function dessinerCadenas(c, graine) {
   // tampon « 1840 – 1896 »
   g.fillStyle = '#a1262a'; g.font = 'bold 9px Georgia, serif'; g.save(); g.translate(122, 20); g.rotate(-.18);
   g.fillText('1840', -10, 0); g.fillText('1896', -10, 11); g.strokeStyle = '#a1262a'; g.strokeRect(-14, -10, 30, 25); g.restore();
+}
+// teaser de La Carte repeinte : une carte castillane presque vide, à moitié repeinte à la manière des codex
+function dessinerCarte(c) {
+  const g = c.getContext('2d'), P = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  P(0, 0, 160, 60, '#d7dccb');                                   // la mer
+  for (let y = 4; y < 60; y += 6) for (let x = (y % 12 ? 0 : 3); x < 160; x += 6) P(x, y, 3, 1, '#b9c2b0');
+  // la terre (vélin castillan), côte en escalier
+  const cote = [70, 72, 74, 75, 76, 76, 75, 73, 72, 72, 73, 75, 78, 82, 86, 90, 94, 98, 102, 105];
+  cote.forEach((x, i) => { P(0, i * 3, x, 3, '#e9dfc6'); P(x, i * 3, 1, 3, '#6b5233'); });
+  // côté castillan : un petit château et du vide
+  P(18, 14, 9, 7, '#efe6cf'); P(18, 12, 2, 2, '#6b5233'); P(22, 12, 2, 2, '#6b5233'); P(26, 12, 1, 2, '#6b5233'); P(18, 14, 9, 1, '#6b5233'); P(21, 17, 3, 4, '#6b5233');
+  P(8, 34, 5, 1, '#9c8762'); P(14, 34, 9, 1, '#9c8762'); P(10, 37, 12, 1, '#9c8762');   // « terra incognita »
+  // côté repeint : la lagune bleue, l'île, les chaussées, le temple, les chinampas
+  P(40, 22, 30, 22, '#3f86ad'); P(38, 25, 2, 16, '#3f86ad'); P(70, 25, 2, 16, '#3f86ad');
+  for (let i = 0; i < 6; i++) P(43 + i * 4, 25 + (i % 2) * 12, 2, 1, '#bfe0ea');
+  P(51, 28, 9, 11, '#efe2c0'); P(55, 22, 1, 6, '#c9ad74'); P(55, 39, 1, 5, '#c9ad74'); P(42, 33, 9, 1, '#c9ad74');
+  P(52, 34, 7, 3, '#dc9d2c'); P(53, 32, 2, 2, '#3f86ad'); P(56, 32, 2, 2, '#b23f2a');
+  for (let i = 0; i < 4; i++) P(62 + i * 2, 40, 1, 3, '#6c8b35');
+  P(40, 22, 32, 1, '#1d1813'); P(40, 44, 32, 1, '#1d1813');
+  // traces de pas qui partent vers l'est
+  [[76, 30], [82, 27], [88, 30], [94, 27], [100, 30]].forEach(([x, y]) => { P(x, y, 2, 3, '#1d1813'); P(x, y - 2, 1, 1, '#1d1813'); P(x + 1, y - 2, 1, 1, '#1d1813'); });
+  // frise en escalier (grecque) en bas, et le point d'interrogation du teaser
+  P(0, 54, 160, 6, '#efe2c0'); for (let x = 0; x < 160; x += 8) { P(x, 55, 1, 4, '#b23f2a'); P(x, 55, 4, 1, '#b23f2a'); P(x + 3, 55, 1, 2, '#b23f2a'); P(x + 4, 58, 4, 1, '#b23f2a'); }
+  P(0, 54, 160, 1, '#1d1813');
+  g.fillStyle = '#b23f2a'; g.font = 'bold 14px Georgia, serif'; g.fillText('?', 132, 40);
 }
 // petit ciel étoilé en pixel art pour l'illustration de chaque carte
 function dessinerCiel(c, graine) {
