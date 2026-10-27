@@ -256,6 +256,7 @@ body.portrait #dialog{top:var(--below,60vh);bottom:auto;}
 #unlock .u-sub{font-family:var(--fell);font-style:italic;color:var(--gold2);font-size:1.05em;margin-top:-4px;}
 .idea .sub{font-family:var(--fell);font-style:italic;font-weight:400;color:var(--ink2);font-size:.9em;}
 .idea.bonus canvas{filter:drop-shadow(0 0 3px rgba(255,207,90,.8));}
+.public .betaonly{display:none!important}
 </style>
 
 <div id="app">
@@ -312,6 +313,10 @@ function hash(x, y, s = 0) { let h = (x * 374761393 + y * 668265263 + s * 214748
 function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
 /* ---------- État ---------- */
+/* Le même fichier sert aux deux sites : monsieurmenard.github.io/histoire/ (mes élèves) et /histoireenjeu/ (public).
+   Sur le site public, le code de bêta-testeur est caché et le certificat ne nomme pas l'école. */
+const PUBLIC = /\/histoireenjeu(\/|$)/i.test(location.pathname);
+if (PUBLIC) document.documentElement.classList.add('public');
 const SAVE_KEY = 'ciel-humanistes-v1';
 function freshState() {
   return {
@@ -700,7 +705,7 @@ async function drawCertificate() {
   // pied : date, école, signature
   g.textAlign = 'left'; g.fillStyle = '#2a1d13'; g.font = `26px ${AL}`;
   g.fillText(`Fait le ${certDate()}`, 150, 985);
-  g.fillStyle = '#5a4632'; g.font = `italic 22px ${FELL}`; g.fillText('École Joseph-François-Perrault · Histoire, secondaire 2', 150, 1018);
+  g.fillStyle = '#5a4632'; g.font = `italic 22px ${FELL}`; g.fillText(PUBLIC ? 'Histoire en jeu · Histoire, secondaire 2' : 'École Joseph-François-Perrault · Histoire, secondaire 2', 150, 1018);
   g.fillText('Chapitre 1 : Le renouvellement de la vision de l\'homme', 150, 1046);
   g.textAlign = 'center'; g.strokeStyle = '#2a1d13'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(Wc - 520, 995); g.lineTo(Wc - 170, 995); g.stroke();
   g.fillStyle = '#2a1d13'; g.font = `24px ${AL}`; g.fillText('M. Ménard, enseignant', Wc - 345, 1028);
@@ -3190,7 +3195,7 @@ const Game = {
         <div class="preview"><canvas id="pv" width="18" height="22"></canvas><div class="pname" id="pvName">…</div><div class="pbg" id="pvBg"></div></div>
         <div>
           <div class="field"><label for="nom">Ton nom</label><input type="text" id="nom" maxlength="24" placeholder="Ex. : Caterina, Pieter, Lorenzo…" autocomplete="off" value="${esc(S.name)}" aria-describedby="nomMsg"><div id="nomMsg" class="nommsg" aria-live="polite"></div></div>
-          <div class="field"><label for="code">Code de bêta-testeur <span style="font-weight:400;opacity:.75">(facultatif, si ton enseignant t'en a donné un)</span></label><input type="text" id="code" maxlength="16" autocomplete="off" style="max-width:200px;text-transform:uppercase" value="${S.beta ? '•••••' : ''}" ${S.beta ? 'disabled' : ''}><div id="codeMsg" class="nommsg" aria-live="polite" style="color:var(--ok)">${S.beta ? 'Code accepté : tu es bêta-testeur officiel!' : ''}</div></div>
+          <div class="field betaonly"><label for="code">Code de bêta-testeur <span style="font-weight:400;opacity:.75">(facultatif, si ton enseignant t'en a donné un)</span></label><input type="text" id="code" maxlength="16" autocomplete="off" style="max-width:200px;text-transform:uppercase" value="${S.beta ? '•••••' : ''}" ${S.beta ? 'disabled' : ''}><div id="codeMsg" class="nommsg" aria-live="polite" style="color:var(--ok)">${S.beta ? 'Code accepté : tu es bêta-testeur officiel!' : ''}</div></div>
           <div class="field"><span class="lab">Ta famille</span><div class="bgcards" id="bgs">
             ${Object.keys(BGS).map(k => `<button type="button" class="bgcard" data-bg="${k}" aria-pressed="${S.bg === k}"><b>${BGS[k].label}</b><span>${BGTXT[k].d}</span><span class="adv">${BGTXT[k].a}</span></button>`).join('')}
           </div></div>
@@ -3397,7 +3402,7 @@ const Game = {
       <div class="field"><span class="lab">Son</span><div class="seg"><button type="button" id="mS" aria-pressed="${S.sound}">Effets ${S.sound ? 'activés' : 'coupés'}</button><button type="button" id="mM" aria-pressed="${S.music}">Musique ${S.music ? 'activée' : 'coupée'}</button></div></div>
       <div class="field"><span class="lab">Contrôles tactiles</span><div class="seg"><button type="button" data-tc="auto" aria-pressed="${(S.touch || 'auto') === 'auto'}">Automatique</button><button type="button" data-tc="on" aria-pressed="${S.touch === 'on'}">Toujours afficher</button><button type="button" data-tc="off" aria-pressed="${S.touch === 'off'}">Masquer</button></div></div>
       <p style="font-size:.85em"><b>Clavier :</b> flèches ou ZQSD/WASD pour marcher, Espace ou Entrée pour parler et agir, C pour le carnet, Échap pour ce menu. <b>Souris ou doigt :</b> touche le sol pour t'y rendre, une personne pour lui parler.</p>
-      <div class="field"><span class="lab">Code de bêta-testeur</span>${S.beta ? '<p style="margin:0;color:var(--ok);font-weight:700">Code accepté : tu es bêta-testeur officiel!</p>' : '<div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="mCode" maxlength="16" autocomplete="off" style="font-family:var(--serif);font-size:1em;padding:5px 10px;border:2px solid var(--ink);border-radius:3px;background:#fffaf0;color:var(--ink);text-transform:uppercase;max-width:200px"><button class="btn" type="button" id="mCodeOk">Valider</button></div><div id="mCodeMsg" class="nommsg" aria-live="polite"></div>'}</div>
+      <div class="field betaonly"><span class="lab">Code de bêta-testeur</span>${S.beta ? '<p style="margin:0;color:var(--ok);font-weight:700">Code accepté : tu es bêta-testeur officiel!</p>' : '<div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="mCode" maxlength="16" autocomplete="off" style="font-family:var(--serif);font-size:1em;padding:5px 10px;border:2px solid var(--ink);border-radius:3px;background:#fffaf0;color:var(--ink);text-transform:uppercase;max-width:200px"><button class="btn" type="button" id="mCodeOk">Valider</button></div><div id="mCodeMsg" class="nommsg" aria-live="polite"></div>'}</div>
       ${isProf() ? `<h3>Menu enseignant</h3><p style="font-size:.85em;margin-top:0">Aller directement à une ville (utile en projection). La progression est conservée.</p>
       <div class="btnrow" style="margin-top:4px"><button class="btn" type="button" data-go="florence">Florence</button><button class="btn" type="button" data-go="anvers">Anvers</button><button class="btn" type="button" data-go="cologne">Cologne</button><button class="btn" type="button" data-go="epi">Épilogue</button><button class="btn ghost" type="button" id="mProfOff">Désactiver le mode enseignant</button></div>` : ''}
       <div class="btnrow"><button class="btn gold" type="button" data-close>Reprendre</button><button class="btn ghost" type="button" id="mT">Écran titre</button><button class="btn ghost" type="button" id="mR">Recommencer du début</button></div><div id="mc"></div>`);
