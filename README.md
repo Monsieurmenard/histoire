@@ -4,8 +4,6 @@ Jeux éducatifs en HTML pour les cours d'histoire (secondaire 2 et 4).
 
 Site : https://monsieurmenard.github.io/histoire/
 
-> Ce site est celui **de mes élèves**. La vitrine publique, pour partager hors de l'école, est https://monsieurmenard.github.io/histoireenjeu/ (dépôt `histoireenjeu`), avec seulement Le Ciel des humanistes et le teaser de La Carte repeinte.
-
 ## Contenu
 
 - `index.html` : page d'accueil qui liste les jeux
@@ -29,5 +27,3 @@ Le fichier `six-vies/index.html` est **chiffré** : il ne contient que du texte 
 ## Corriger un jeu
 
 Remplace le fichier `index.html` du dossier du jeu. Les élèves auront la nouvelle version au même lien.
-
-**Le Ciel des humanistes** est aussi sur le site public : son fichier est identique dans les deux dépôts (le jeu détecte le site public, y cache le code de bêta-testeur et retire le nom de l'école du certificat). Après une correction, remplace-le **dans les deux dépôts**.
