@@ -29,7 +29,7 @@
   .tag{font-family:var(--pix);font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--lapis);color:var(--parch);padding:2px 7px;border-radius:2px}
   .tag.beta{background:#b4412b}
   .tag.lock{background:var(--ink)}
-  .card h2{font-family:var(--pix);font-weight:700;color:var(--lapis);font-size:22px;margin:0;line-height:1.1}
+  .card h3{font-family:var(--pix);font-weight:700;color:var(--lapis);font-size:22px;margin:0;line-height:1.1}
   .card p{margin:0;font-size:15.5px}
   .meta{font-size:13.5px;color:var(--ink2);font-style:italic}
   .play{margin-top:auto;align-self:flex-start;font-family:var(--pix);font-weight:700;font-size:16px;background:var(--gold);color:var(--ink);border:2px solid var(--ink);border-radius:3px;padding:8px 18px;box-shadow:0 3px 0 var(--ink);text-decoration:none}
@@ -46,12 +46,22 @@
   .nouveau b{color:#a1262a;font-family:var(--pix);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
   .nouveau ul{margin:.3em 0 0;padding-left:1.1em}
   .nouveau li{margin:.1em 0}
-  .card h2 small{display:block;font-family:var(--serif);font-style:italic;font-weight:400;font-size:15px;color:#b23f2a;margin-top:3px}
+  .card h3 small{display:block;font-family:var(--serif);font-style:italic;font-weight:400;font-size:15px;color:#b23f2a;margin-top:3px}
   .card.teaser{background:#efe2c0;box-shadow:0 0 0 3px #b23f2a,0 8px 0 3px #000}
   .card.teaser .art{background:#d7dccb}
   .tag.codex{background:#b23f2a}
   .majbadge.bientot{background:#1d1813;color:#efe2c0;box-shadow:0 2px 0 #b23f2a}
   .play.off{background:#e4d1a3;color:#5a4632;box-shadow:none;border-style:dashed;cursor:default}
+  .niveaux{display:flex;justify-content:center;flex-wrap:wrap;gap:12px;margin:-8px 0 34px}
+  .niveaux a{font-family:var(--pix);font-weight:700;font-size:17px;color:var(--ink);background:var(--parch);border:2px solid var(--ink);border-radius:3px;padding:9px 18px;box-shadow:0 0 0 2px var(--gold3),0 4px 0 2px #000;text-decoration:none}
+  .niveaux a:hover{background:var(--gold2)}
+  .niveaux a:focus-visible{outline:3px solid var(--gold2);outline-offset:4px}
+  .niveaux a span{font-family:var(--serif);font-weight:400;font-style:italic;font-size:14px;color:var(--ink2);margin-left:6px}
+  .niveau{scroll-margin-top:16px}
+  .niveau + .niveau{margin-top:52px}
+  .niveau > h2{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px;margin:0 0 18px;padding-bottom:10px;border-bottom:2px solid rgba(226,174,72,.5)}
+  .niveau > h2 b{font-family:var(--pix);font-weight:700;color:var(--gold2);font-size:clamp(26px,4.5vw,34px);line-height:1}
+  .niveau > h2 i{font-weight:400;font-size:16px;color:var(--parch2)}
   footer{margin-top:40px;text-align:center;font-size:14px;color:var(--parch2)}
   footer b{font-family:var(--pix);color:var(--gold2);font-weight:500}
 </style>
@@ -64,7 +74,9 @@
     <p>Des jeux pour explorer le passé à partir de vrais documents historiques. Choisis un jeu, puis laisse-toi guider. Ta partie est sauvegardée dans ce navigateur.</p>
   </header>
 
-  <main class="grid" id="jeux"></main>
+  <nav class="niveaux" aria-label="Aller à mon niveau" id="nav"></nav>
+
+  <main id="jeux"></main>
 
   <footer>
     <p><b>Version bêta.</b> Tu as trouvé une erreur, un bogue ou une information douteuse? Signale-la à ton enseignant.<br>Et n'oublie pas : rien ne vaut un bon cahier de notes de cours!</p>
@@ -119,23 +131,47 @@ const JEUX = [
   // , { titre: "Prochain jeu", dossier: "prochain-jeu/", niveau: "Secondaire 4", chapitre: "…", duree: "…", resume: "…" }
 ];
 
-const grille = document.getElementById('jeux');
-JEUX.forEach((j, k) => {
+/* Les sections de la page d'accueil, dans l'ordre. Le champ « niveau » de chaque jeu doit
+   correspondre exactement au nom d'une section. Lien direct vers une section : …/histoire/#sec2 */
+const NIVEAUX = [
+  { nom: "Secondaire 2", id: "sec2", programme: "Histoire et éducation à la citoyenneté" },
+  { nom: "Secondaire 4", id: "sec4", programme: "Histoire du Québec et du Canada" }
+];
+
+const zone = document.getElementById('jeux'), nav = document.getElementById('nav');
+let k = 0;
+NIVEAUX.forEach(n => {
+  const jeux = JEUX.filter(j => j.niveau === n.nom);
+  if (!jeux.length) return;
+  const sec = document.createElement('section');
+  sec.className = 'niveau'; sec.id = n.id; sec.setAttribute('aria-labelledby', n.id + '-titre');
+  sec.innerHTML = `<h2 id="${n.id}-titre"><b>${n.nom}</b><i>${n.programme}</i></h2><div class="grid"></div>`;
+  zone.appendChild(sec);
+  const grille = sec.querySelector('.grid');
+  const dispo = jeux.filter(j => !j.bientot).length;
+  nav.insertAdjacentHTML('beforeend', `<a href="#${n.id}">${n.nom}<span>${dispo} jeu${dispo > 1 ? 'x' : ''}</span></a>`);
+  jeux.forEach(j => grille.appendChild(carte(j, ++k)));
+});
+
+function carte(j, k) {
   const a = document.createElement('article'); a.className = 'card' + (j.maj ? ' maj' : '') + (j.bientot ? ' teaser' : '');
   a.innerHTML = `${j.maj ? '<div class="majbadge" aria-hidden="true">Mis à jour</div>' : ''}${j.bientot ? '<div class="majbadge bientot" aria-hidden="true">Bientôt</div>' : ''}<div class="art"><canvas width="160" height="60" aria-hidden="true"></canvas></div>
     <div class="body">
-      <div class="tags"><span class="tag">${j.niveau}</span>${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}${j.maj ? `<span class="tag maj">Mise à jour · ${j.maj.date}</span>` : ''}${j.bientot ? `<span class="tag codex">Bientôt · ${j.bientot}</span>` : ''}</div>
-      <h2>${j.titre}${j.sousTitre ? `<small>${j.sousTitre}</small>` : ''}</h2>
+      <div class="tags">${j.beta ? '<span class="tag beta">Bêta</span>' : ''}${j.verrou ? '<span class="tag lock">Accès réservé</span>' : ''}${j.maj ? `<span class="tag maj">Mise à jour · ${j.maj.date}</span>` : ''}${j.bientot ? `<span class="tag codex">Bientôt · ${j.bientot}</span>` : ''}</div>
+      <h3>${j.titre}${j.sousTitre ? `<small>${j.sousTitre}</small>` : ''}</h3>
       <p>${j.resume}</p>
       ${j.maj ? `<div class="nouveau"><b>Quoi de neuf?</b><ul>${j.maj.nouveautes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
       <div class="meta">${j.chapitre} · ${j.duree}</div>
       ${j.bientot ? `<span class="play off">Arrive en ${j.bientot.toLowerCase()}</span>` : `<a class="play" href="${j.dossier}">${j.verrou ? 'Entrer le mot de passe ▶' : 'Jouer ▶'}</a>`}
     </div>`;
-  grille.appendChild(a);
-  if (j.bientot) dessinerCarte(a.querySelector('canvas'));
-  else if (j.verrou) dessinerCadenas(a.querySelector('canvas'), k + 1);
-  else dessinerCiel(a.querySelector('canvas'), k + 1);
-});
+  const c = a.querySelector('canvas');
+  if (j.bientot) dessinerCarte(c);
+  else if (j.verrou) dessinerCadenas(c, k);
+  else dessinerCiel(c, k);
+  return a;
+}
+// si on arrive avec un lien direct (#sec2, #sec4), on descend à la bonne section une fois la page construite
+if (location.hash) { const cible = document.querySelector(location.hash); if (cible) cible.scrollIntoView(); }
 // cadenas en pixel art sur papier de registre, pour les jeux protégés
 function dessinerCadenas(c, graine) {
   const g = c.getContext('2d');
